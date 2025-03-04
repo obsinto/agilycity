@@ -231,7 +231,96 @@
     </div>
 @endsection
 
+@push('styles')
+    <style>
+        /* Estilos personalizados para o DateRangePicker */
+        .daterangepicker {
+            font-family: inherit;
+            border-radius: 0.375rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .daterangepicker .ranges li {
+            background-color: #f9fafb;
+            border-radius: 0.25rem;
+            color: #374151;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .daterangepicker .ranges li:hover {
+            background-color: #f3f4f6;
+        }
+
+        .daterangepicker .ranges li.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .daterangepicker td.active,
+        .daterangepicker td.active:hover {
+            background-color: #3b82f6;
+        }
+
+        .daterangepicker td.in-range {
+            background-color: #dbeafe;
+        }
+
+        .daterangepicker .drp-buttons .btn {
+            border-radius: 0.25rem;
+        }
+
+        .daterangepicker .drp-buttons .applyBtn {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        .daterangepicker .drp-buttons .applyBtn:hover {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+    </style>
+@endpush
+
 @push('scripts')
     {{-- Importa o arquivo principal do dashboard (resources/js/dashboard/index.js) via Vite --}}
     @vite('resources/js/dashboard/index.js')
+
+    <script>
+        /**
+         * Função para limpar todos os filtros
+         */
+        function clearFilters() {
+            // Limpar seleção de secretaria e departamento
+            $('#secretary').val('');
+            $('#department').val('');
+            $('#expenseType').val('');
+            $('#department option').show();
+
+            // Resetar daterangepicker para o mês atual
+            const picker = $('#dateRange').data('daterangepicker');
+            if (picker) {
+                const startDate = moment().startOf('month');
+                const endDate = moment().endOf('month');
+                picker.setStartDate(startDate);
+                picker.setEndDate(endDate);
+                $('#dateRange').val(startDate.format('DD/MM/YYYY') + ' - ' + endDate.format('DD/MM/YYYY'));
+            }
+
+            // Atualizar o dashboard
+            updateDashboardData(moment().startOf('month'), moment().endOf('month'));
+        }
+
+        /**
+         * Função para mostrar detalhes de um departamento
+         */
+        function showDepartmentDetails(secretaryId) {
+            // Selecionar a secretaria no filtro
+            $('#secretary').val(secretaryId).trigger('change');
+
+            // Rolar até o topo da página
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+    </script>
 @endpush

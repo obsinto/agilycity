@@ -132,13 +132,12 @@ class DashboardController extends Controller
         $query = Expense::with(['secretary', 'department', 'expenseType']);
 
         // Filtros (período, departamento, tipo de despesa, secretaria)
-        if ($request->filled('date_range')) {
-            $dateRange = explode(' - ', $request->date_range);
-            if (count($dateRange) == 2) {
-                $startDate = Carbon::createFromFormat('d/m/Y', trim($dateRange[0]))->startOfDay();
-                $endDate = Carbon::createFromFormat('d/m/Y', trim($dateRange[1]))->endOfDay();
-                $query->whereBetween('expense_date', [$startDate, $endDate]);
-            }
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            // Aqui, você já recebe as datas no formato YYYY-MM-DD
+            $startDate = Carbon::createFromFormat('Y-m-d', $request->start_date)->startOfDay();
+            $endDate = Carbon::createFromFormat('Y-m-d', $request->end_date)->endOfDay();
+
+            $query->whereBetween('expense_date', [$startDate, $endDate]);
         }
 
         if ($request->filled('department_id')) {

@@ -67,6 +67,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('expense-types', ExpenseTypeController::class)->middleware(['auth', 'role:secretary|sector_leader']);
     Route::resource('expenses', ExpenseController::class)->middleware(['auth', 'role:secretary|sector_leader']);
 
+    // Dashboard filter routes
     Route::get('/dashboard/filter', [DashboardController::class, 'filter'])->name('dashboard.filter');
     Route::get('/dashboard/secretary/{secretary}/details', [DashboardController::class, 'getSecretaryDetails'])
         ->name('dashboard.secretary.details');
@@ -74,8 +75,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role:mayor'])->group(function () {
         Route::resource('spending-caps', SpendingCapController::class);
     });
-
-
 });
 
 require __DIR__ . '/auth.php';
