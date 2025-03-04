@@ -131,15 +131,21 @@ class DashboardController extends Controller
         // Consulta base com eager loading das relações necessárias
         $query = Expense::with(['secretary', 'department', 'expenseType']);
 
+        // Definir período de referência - padrão: mês atual
+        $referenceStartDate = now()->startOfMonth();
+        $referenceEndDate = now()->endOfMonth();
+
         // Filtros (período, departamento, tipo de despesa, secretaria)
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            // Aqui, você já recebe as datas no formato YYYY-MM-DD
-            $startDate = Carbon::createFromFormat('Y-m-d', $request->start_date)->startOfDay();
-            $endDate = Carbon::createFromFormat('Y-m-d', $request->end_date)->endOfDay();
+            // Armazena as datas de referência para calcular currentMonthExpenses
+            $referenceStartDate = Carbon::createFromFormat('Y-m-d', $request->start_date)->startOfDay();
+            $referenceEndDate = Carbon::createFromFormat('Y-m-d', $request->end_date)->endOfDay();
 
-            $query->whereBetween('expense_date', [$startDate, $endDate]);
+            // Aplica o filtro à consulta
+            $query->whereBetween('expense_date', [$referenceStartDate, $referenceEndDate]);
         }
 
+        // Outros filtros (sem alterações)
         if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
@@ -157,77 +163,102 @@ class DashboardController extends Controller
         // Executa a consulta
         $expenses = $query->get();
 
-        // Definindo os períodos para cálculos
-        $currentMonth = now()->format('Y-m');
-        $lastMonth = now()->subMonth()->format('Y-m');
+        // ===== ALTERAÇÃO IMPORTANTE =====
+        // Em vez de re-filtrar para o mês atual, usamos o mesmo período do filtro
+        // para calcular o "currentMonthExpenses"
 
-        // Cálculo das despesas do mês atual e anterior
-        $currentMonthExpenses = $expenses->filter(function ($expense) use ($currentMonth) {
-            return $expense->expense_date->format('Y-m') === $currentMonth;
+        // Calculamos o período de referência para "mês atual" e "mês anterior"
+        $currentPeriodStart = $referenceStartDate->copy();
+        $currentPeriodEnd = $referenceEndDate->copy();
+
+        // Calculamos o "mês anterior" como o período equivalente anterior
+        $periodLength = $currentPeriodEnd->diffInDays($currentPeriodStart) + 1;
+        $previousPeriodEnd = $currentPeriodStart->copy()->subDay();
+        $previousPeriodStart = $previousPeriodEnd->copy()->subDays($periodLength - 1);
+
+        // Cálculo das despesas do período atual e anterior
+        $currentPeriodExpenses = $expenses->filter(function ($expense) use ($currentPeriodStart, $currentPeriodEnd) {
+            return $expense->expense_date >= $currentPeriodStart && $expense->expense_date <= $currentPeriodEnd;
         })->sum('amount');
 
-        $lastMonthExpenses = $expenses->filter(function ($expense) use ($lastMonth) {
-            return $expense->expense_date->format('Y-m') === $lastMonth;
-        })->sum('amount');
+        // Se não usamos o filtro de data, mantemos a lógica original para o mês anterior
+        if (!$request->filled('start_date') || !$request->filled('end_date')) {
+            $lastMonth = now()->subMonth()->format('Y-m');
+            $lastMonthExpenses = $expenses->filter(function ($expense) use ($lastMonth) {
+                return $expense->expense_date->format('Y-m') === $lastMonth;
+            })->sum('amount');
+        } else {
+            // Caso contrário, calculamos baseado no período anterior equivalente
+            $lastMonthExpenses = $expenses->filter(function ($expense) use ($previousPeriodStart, $previousPeriodEnd) {
+                return $expense->expense_date >= $previousPeriodStart && $expense->expense_date <= $previousPeriodEnd;
+            })->sum('amount');
+        }
 
-        // Dados mensais e séries para o gráfico de linha
-        $monthlyExpenses = $this->getMonthlyData($expenses);
-        $secretaries = $request->filled('secretary_id')
-            ? Secretary::where('id', $request->secretary_id)->get()
-            : Secretary::with(['expenses'])->get();
-        $series = $this->calculateSecretarySeries($secretaries, $monthlyExpenses);
+        // Resto do código sem alterações
 
-        // Dados para o treemap e gráfico de pizza
-        $hierarchicalData = $this->getHierarchicalData($expenses);
-        $expenseTypeData = $this->getExpenseTypeData($expenses);
-        $secretariesData = $this->getSecretariesData($expenses);
+        // Define o orçamento mensal padrão
+        $monthlyBudget = config('app.default_monthly_budget', 30000);
 
-        // Dados agregados por Departamento para o gráfico de barras
-        $departmentsData = Department::with('expenses')
+        // Obtém o teto de gastos baseado nos filtros
+        $filters = [
+            'secretary_id' => $request->secretary_id,
+            'department_id' => $request->department_id,
+            'expense_type' => $request->expense_type
+        ];
+        $capValue = $this->expenseCapService->getCapForFilters($filters);
+
+        // Garante que capValue não seja nulo
+        if (is_null($capValue) || $capValue <= 0) {
+            $capValue = $monthlyBudget;
+        }
+
+        // Log para depuração
+        \Log::info('Dados para o gauge:', [
+            'filtros' => $filters,
+            'período' => [
+                'início' => $referenceStartDate->format('Y-m-d'),
+                'fim' => $referenceEndDate->format('Y-m-d'),
+            ],
+            'capValue' => $capValue,
+            'currentPeriodExpenses' => $currentPeriodExpenses
+        ]);
+
+        return response()->json([
+            'totalExpenses' => $expenses->sum('amount'),
+            'currentMonthExpenses' => $currentPeriodExpenses, // Renomeado para refletir que pode não ser um mês
+            'lastMonthExpenses' => $lastMonthExpenses,
+            'totalTransactions' => $expenses->count(),
+            'monthlyExpenses' => $this->getMonthlyData($expenses),
+            'series' => $this->calculateFilteredSeries($expenses),
+            'hierarchicalData' => $this->getHierarchicalData($expenses),
+            'expenseTypeData' => $this->getExpenseTypeData($expenses),
+            'secretaries' => $this->getSecretariesData($expenses),
+            'departmentsData' => $this->getDepartmentsData($expenses),
+            'monthlyBudget' => $monthlyBudget,
+            'capValue' => $capValue,
+            'referenceStartDate' => $referenceStartDate->format('Y-m-d'),
+            'referenceEndDate' => $referenceEndDate->format('Y-m-d'),
+        ]);
+    }
+
+    // Método auxiliar (adicione ao controller)
+    private function getDepartmentsData($expenses)
+    {
+        return Department::with('expenses')
             ->get()
             ->map(function ($department) use ($expenses) {
                 $total = $expenses->where('department_id', $department->id)->sum('amount');
                 return [
                     'name' => $department->name,
                     'total' => $total,
+                    'id' => $department->id
                 ];
             })
             ->filter(function ($dept) {
                 return $dept['total'] > 0;
             })
+            ->sortByDesc('total')
             ->values();
-
-        // Obter o teto de gastos baseado nos filtros
-        $filters = [
-            'secretary_id' => $request->secretary_id,
-            'department_id' => $request->department_id,
-            'expense_type' => $request->expense_type
-        ];
-
-        // Usar o ExpenseCapService para obter o teto de gastos
-        $capValue = $this->expenseCapService->getCapForFilters($filters);
-
-        // Se não houver teto específico, usar o orçamento mensal padrão
-        $monthlyBudget = 30000; // Valor padrão caso necessário
-        if (!$capValue) {
-            $capValue = $monthlyBudget;
-        }
-
-        \Log::info('Valor de capValue: ' . $capValue);
-        return response()->json([
-            'totalExpenses' => $expenses->sum('amount'),
-            'currentMonthExpenses' => $currentMonthExpenses,
-            'lastMonthExpenses' => $lastMonthExpenses,
-            'totalTransactions' => $expenses->count(),
-            'monthlyExpenses' => $monthlyExpenses,
-            'series' => $series,
-            'hierarchicalData' => $hierarchicalData,
-            'expenseTypeData' => $expenseTypeData,
-            'secretaries' => $secretariesData,
-            'departmentsData' => $departmentsData,
-            'monthlyBudget' => $monthlyBudget,
-            'capValue' => $capValue,
-        ]);
     }
 
 

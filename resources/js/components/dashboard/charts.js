@@ -45,39 +45,109 @@ export function renderBarChart(selector, categories, values) {
 
 /**
  * Renderiza um gráfico do tipo velocímetro (gauge).
- * @param {string} selector - O ID do elemento onde o gráfico será renderizado.
- * @param {number} value - O valor atual para exibir (ex.: a porcentagem de realização orçamentária).
- * @param {number} maxValue - O valor máximo da escala (padrão 100).
+ import * as echarts from 'echarts';
+ import { formatCurrency } from './utils';
+
+ /**
+ * Renderiza um gráfico de gauge para visualizar as despesas atuais em relação ao teto de gastos
+ /**
+ * Formata um valor numérico como moeda (fallback caso utils.js não esteja disponível)
+ * @param {number} value - Valor a ser formatado
+ * @return {string} - Valor formatado como moeda
  */
-export function renderGaugeChart(selector, value, maxValue = 100) {
+function formatCurrencyInternal(value) {
+    if (typeof window.formatCurrency === 'function') {
+        return window.formatCurrency(value);
+    }
+
+    // Implementação de fallback
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        minimumFractionDigits: 2
+    }).format(value);
+}
+
+/**
+ * Renderiza um gráfico de gauge para visualizar as despesas atuais em relação ao teto de gastos
+ *
+ * @param {string} selector - ID do elemento DOM onde renderizar o gráfico
+ * @param {number} value - Valor atual de despesas do mês
+ * @param {number} capValue - Valor do teto de gastos
+ */
+export function renderGaugeChart(selector, value, capValue) {
     const chartDom = document.getElementById(selector);
     if (!chartDom) return;
 
+    // Garantir que os valores sejam números
+    value = parseFloat(value) || 0;
+    capValue = parseFloat(capValue) || 100000; // Usar 100000 como fallback se for 0 ou inválido
+
+    // Calcular a porcentagem de uso
+    const percentage = (value / capValue) * 100;
+
+    // Limpa qualquer gráfico existente
+    echarts.dispose(chartDom);
     const myChart = echarts.init(chartDom);
+
+    // Log do cálculo para depuração
+    console.log(`Gauge: ${formatCurrencyInternal(value)} / ${formatCurrencyInternal(capValue)} = ${percentage.toFixed(1)}%`);
 
     const option = {
         tooltip: {
-            formatter: '{a} <br/>{b} : {c}%'
+            formatter: function (params) {
+                return `Orçamento Mensal<br/>
+                       Gasto Atual: ${formatCurrencyInternal(value)}<br/>
+                       Teto: ${formatCurrencyInternal(capValue)}<br/>
+                       Utilizado: ${percentage.toFixed(1)}%`;
+            }
         },
         series: [
             {
                 name: 'Orçamento',
                 type: 'gauge',
+                min: 0,
+                max: 100,
+                splitNumber: 10,
+                radius: '90%',
+                axisLabel: {
+                    formatter: '{value}%',
+                    distance: -40,
+                    color: '#999',
+                    fontSize: 10
+                },
                 detail: {
-                    formatter: function (val) {
-                        if (!maxValue) return '0%';
-                        return ((val / maxValue) * 100).toFixed(0) + '%';
+                    formatter: function () {
+                        return `${percentage.toFixed(0)}%\n${formatCurrencyInternal(value)}`;
+                    },
+                    offsetCenter: [0, '60%'],
+                    style: {
+                        fontSize: 14,
+                        fontWeight: 'bold',
+                        lineHeight: 20
                     }
                 },
-                data: [{value: value, name: 'Gastos'}],
+                data: [{
+                    value: percentage,
+                    name: 'Gastos'
+                }],
+                title: {
+                    fontSize: 12,
+                    offsetCenter: [0, '80%']
+                },
                 axisLine: {
                     lineStyle: {
-                        width: 10,
+                        width: 30,
                         color: [
-                            [0.3, '#67e0e3'], // 0-30%: verde-água
-                            [0.7, '#37a2da'], // 30-70%: azul
-                            [1, '#fd666d']    // 70-100%: vermelho
+                            [0.3, '#67e0e3'],  // 0-30%: verde-água
+                            [0.7, '#37a2da'],  // 30-70%: azul
+                            [1, '#fd666d']     // 70-100%: vermelho
                         ]
+                    }
+                },
+                pointer: {
+                    itemStyle: {
+                        color: 'auto'
                     }
                 }
             }
@@ -85,6 +155,13 @@ export function renderGaugeChart(selector, value, maxValue = 100) {
     };
 
     myChart.setOption(option);
+
+    // Torna o gráfico responsivo
+    window.addEventListener('resize', function () {
+        myChart.resize();
+    });
+
+    return myChart;
 }
 
 // Outras funções já existentes: renderTreemap, renderExpenseTypePie, renderTimeline, etc.
