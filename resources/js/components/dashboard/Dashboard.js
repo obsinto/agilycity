@@ -64,7 +64,8 @@ function loadDashboardData(filters = {}) {
             });
 
             // Renderiza o gauge com os valores corretos
-            renderGaugeChart('gaugeChart', response.currentMonthExpenses, capValue);
+            renderGaugeChart('gaugeChart', response.currentMonthExpenses, capValue, response.capSource);
+
 
             // Oculta o loading
             $('.dashboard-loading').hide();

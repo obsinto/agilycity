@@ -62,7 +62,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'Administração' => ['Sede', 'Arquivo', 'Guarda Municipal', 'INSS', 'Cultura', 'Almoxarifado Central'],
             'Finanças' => ['Sede', 'Tesouraria e Tributos', 'Contabilidade'],
             'Governo' => ['Sede', 'Controle Interno'],
-            // Para Planejamento, se não houver departamentos definidos, criaremos apenas um departamento "Sede"
             'Planejamento' => ['Sede'],
         ];
 
@@ -89,10 +88,22 @@ class RolesAndPermissionsSeeder extends Seeder
             // Verifica se há departamentos definidos para essa secretaria
             if (isset($departmentsMapping[$secData['name']])) {
                 foreach ($departmentsMapping[$secData['name']] as $deptName) {
-                    // Cria o departamento
+                    // Define se o departamento é uma escola
+                    $isSchool = false;
+                    if ($secData['name'] === 'Educação') {
+                        // Supondo que para a Secretaria de Educação a maioria são escolas,
+                        // exceto alguns departamentos que não representam unidades escolares.
+                        $naoEscola = ['Cantina Central', 'Biblioteca', 'Centro de Cultura', 'Almoxarifado'];
+                        if (!in_array($deptName, $naoEscola)) {
+                            $isSchool = true;
+                        }
+                    }
+
+                    // Cria o departamento com o campo is_school
                     $department = Department::create([
                         'name' => $deptName,
                         'secretary_id' => $secretary->id,
+                        'is_school' => $isSchool,
                     ]);
 
                     // Gera o prefixo de e-mail para o líder a partir do nome do departamento

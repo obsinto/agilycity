@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CredentialsController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DepartmentEnrollmentController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ExpenseTypeController;
 use App\Http\Controllers\ProfileController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\SecretaryManagementController;
 use App\Http\Controllers\SectorLeaderController;
 use App\Http\Controllers\SpendingCapController;
+use App\Http\Controllers\StudentAnalysisController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -77,4 +79,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 });
 
+Route::get('/cantina/report', [\App\Http\Controllers\CantinaReportController::class, 'showMonthCost'])
+    ->name('cantina.report');
+
+Route::get('/reports/students', [StudentAnalysisController::class, 'index'])->name('reports.students');
+
+Route::middleware(['auth', 'role:sector_leader'])->group(function () {
+    // Form de cadastro/listagem
+    Route::get('/enrollments/create', [DepartmentEnrollmentController::class, 'create'])
+        ->name('enrollments.create');
+
+// Salvar novo registro
+    Route::post('/enrollments', [DepartmentEnrollmentController::class, 'store'])
+        ->name('enrollments.store');
+
+// Form de edição
+    Route::get('/enrollments/{enrollment}/edit', [DepartmentEnrollmentController::class, 'edit'])
+        ->name('enrollments.edit');
+
+// Atualizar (PUT)
+    Route::put('/enrollments/{enrollment}', [DepartmentEnrollmentController::class, 'update'])
+        ->name('enrollments.update');
+
+// Deletar
+    Route::delete('/enrollments/{enrollment}', [DepartmentEnrollmentController::class, 'destroy'])
+        ->name('enrollments.destroy');
+    // Salvar no banco
+    Route::post('/enrollments', [DepartmentEnrollmentController::class, 'store'])->name('enrollments.store');
+});
 require __DIR__ . '/auth.php';

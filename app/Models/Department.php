@@ -24,4 +24,15 @@ class Department extends Model
     {
         return $this->hasMany(Expense::class);
     }
+
+    public function enrollments()
+    {
+        return $this->hasMany(DepartmentEnrollment::class);
+    }
+
+    public function scopeSchools($query)
+    {
+        return $query->where('is_school', true);
+    }
+
 }

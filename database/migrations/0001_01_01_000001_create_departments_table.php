@@ -15,6 +15,7 @@ return new class extends Migration {
             $table->string('name');
             $table->text('description')->nullable();
             $table->foreignId('secretary_id')->constrained()->onDelete('cascade');
+            $table->boolean('is_school')->default(false);
             $table->timestamps();
         });
     }

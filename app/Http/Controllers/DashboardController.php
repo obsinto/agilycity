@@ -52,7 +52,7 @@ class DashboardController extends Controller
             $departments = Department::with('secretary')->get();
             $expenseTypes = ExpenseType::distinct()->get();
 
-            // Calcular os maiores performers
+            // Calcular os maiores "gastos" (top performers)
             $topSecretary = $secretaries->sortByDesc(function ($secretary) {
                 return $secretary->expenses->sum('amount');
             })->first();
@@ -86,11 +86,27 @@ class DashboardController extends Controller
 
             $expenseTypes = ExpenseType::select('name')->distinct()->orderBy('name')->get();
 
-            // Utiliza o ExpenseCapService para obter o teto de gastos
-            // Neste exemplo, usamos o secretário com maiores gastos (topSecretary)
-            $capValue = null;
+            // =====================
+            // TETO DE GASTOS
+            // =====================
+            $capValue = 0;
+            $capSource = 'none';
+
+            // Exemplo: buscamos o teto da "topSecretary" (pode não ser o ideal em produção)
             if ($topSecretary) {
-                $capValue = $this->expenseCapService->getCapForExpense($topSecretary->id);
+                // Lê do Service
+                $possibleCap = $this->expenseCapService->getCapForExpense($topSecretary->id);
+
+                // Se vier maior que 0, assumimos que é um teto "macro" (já que não filtramos por tipo)
+                if ($possibleCap > 0) {
+                    $capValue = $possibleCap;
+                    $capSource = 'macro';
+                } else {
+                    // Se for zero, significa que não encontrou nada
+                    // Você pode definir fallback com config('app.default_monthly_budget', 30000) se quiser
+                    $capValue = 0;
+                    $capSource = 'none';
+                }
             }
 
             return view('dashboard.mayor', compact(
@@ -110,7 +126,8 @@ class DashboardController extends Controller
                 'series',
                 'expenseTypes',
                 'expenseTypeData',
-                'capValue' // Passa o teto de gastos para a view
+                'capValue',     // Passa o teto de gastos para a view
+                'capSource'     // Passa a origem do teto para a view
             ));
         }
 
@@ -125,7 +142,9 @@ class DashboardController extends Controller
         return view('dashboard.default');
     }
 
-
+    /**
+     * Método que filtra os dados (provavelmente chamado por AJAX).
+     */
     public function filter(Request $request)
     {
         // Consulta base com eager loading das relações necessárias
@@ -135,17 +154,15 @@ class DashboardController extends Controller
         $referenceStartDate = now()->startOfMonth();
         $referenceEndDate = now()->endOfMonth();
 
-        // Filtros (período, departamento, tipo de despesa, secretaria)
+        // Filtro por data
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            // Armazena as datas de referência para calcular currentMonthExpenses
             $referenceStartDate = Carbon::createFromFormat('Y-m-d', $request->start_date)->startOfDay();
             $referenceEndDate = Carbon::createFromFormat('Y-m-d', $request->end_date)->endOfDay();
 
-            // Aplica o filtro à consulta
             $query->whereBetween('expense_date', [$referenceStartDate, $referenceEndDate]);
         }
 
-        // Outros filtros (sem alterações)
+        // Outros filtros
         if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
@@ -163,69 +180,61 @@ class DashboardController extends Controller
         // Executa a consulta
         $expenses = $query->get();
 
-        // ===== ALTERAÇÃO IMPORTANTE =====
-        // Em vez de re-filtrar para o mês atual, usamos o mesmo período do filtro
-        // para calcular o "currentMonthExpenses"
-
-        // Calculamos o período de referência para "mês atual" e "mês anterior"
+        // =======================
+        // Período atual/anterior
+        // =======================
         $currentPeriodStart = $referenceStartDate->copy();
         $currentPeriodEnd = $referenceEndDate->copy();
 
-        // Calculamos o "mês anterior" como o período equivalente anterior
+        // Calcula o tamanho do período para poder comparar com "período anterior"
         $periodLength = $currentPeriodEnd->diffInDays($currentPeriodStart) + 1;
         $previousPeriodEnd = $currentPeriodStart->copy()->subDay();
         $previousPeriodStart = $previousPeriodEnd->copy()->subDays($periodLength - 1);
 
-        // Cálculo das despesas do período atual e anterior
+        // Soma das despesas no período atual
         $currentPeriodExpenses = $expenses->filter(function ($expense) use ($currentPeriodStart, $currentPeriodEnd) {
             return $expense->expense_date >= $currentPeriodStart && $expense->expense_date <= $currentPeriodEnd;
         })->sum('amount');
 
-        // Se não usamos o filtro de data, mantemos a lógica original para o mês anterior
+        // Soma das despesas no período anterior
         if (!$request->filled('start_date') || !$request->filled('end_date')) {
+            // Sem filtro de data => mês passado no modo "original"
             $lastMonth = now()->subMonth()->format('Y-m');
             $lastMonthExpenses = $expenses->filter(function ($expense) use ($lastMonth) {
                 return $expense->expense_date->format('Y-m') === $lastMonth;
             })->sum('amount');
         } else {
-            // Caso contrário, calculamos baseado no período anterior equivalente
+            // Com filtro de data => período anterior equivalente
             $lastMonthExpenses = $expenses->filter(function ($expense) use ($previousPeriodStart, $previousPeriodEnd) {
                 return $expense->expense_date >= $previousPeriodStart && $expense->expense_date <= $previousPeriodEnd;
             })->sum('amount');
         }
 
-        // Resto do código sem alterações
-
-        // Define o orçamento mensal padrão
-        $monthlyBudget = config('app.default_monthly_budget', 30000);
-
-        // Obtém o teto de gastos baseado nos filtros
+        // Monta array de filtros para o cap service
         $filters = [
             'secretary_id' => $request->secretary_id,
             'department_id' => $request->department_id,
             'expense_type' => $request->expense_type
         ];
-        $capValue = $this->expenseCapService->getCapForFilters($filters);
 
-        // Garante que capValue não seja nulo
+        // Obtém o teto de gastos
+        $capValue = $this->expenseCapService->getCapForFilters($filters);
+        $capSource = 'none';  // Default
+
+        // Se não encontrar teto ou <= 0, usar fallback
+        $monthlyBudget = config('app.default_monthly_budget', 30000);
         if (is_null($capValue) || $capValue <= 0) {
             $capValue = $monthlyBudget;
+            $capSource = 'none'; // Você pode trocar "none" por "fallback" se preferir
+        } else {
+            // Se expense_type foi filtrado => 'specific', senão => 'macro'
+            $capSource = $request->filled('expense_type') ? 'specific' : 'macro';
         }
 
-        // Log para depuração
-        \Log::info('Dados para o gauge:', [
-            'filtros' => $filters,
-            'período' => [
-                'início' => $referenceStartDate->format('Y-m-d'),
-                'fim' => $referenceEndDate->format('Y-m-d'),
-            ],
-            'capValue' => $capValue,
-            'currentPeriodExpenses' => $currentPeriodExpenses
-        ]);
-
+        // Retorna JSON com dados para o front-end
         return response()->json([
             'totalExpenses' => $expenses->sum('amount'),
-            'currentMonthExpenses' => $currentPeriodExpenses, // Renomeado para refletir que pode não ser um mês
+            'currentMonthExpenses' => $currentPeriodExpenses,
             'lastMonthExpenses' => $lastMonthExpenses,
             'totalTransactions' => $expenses->count(),
             'monthlyExpenses' => $this->getMonthlyData($expenses),
@@ -234,14 +243,18 @@ class DashboardController extends Controller
             'expenseTypeData' => $this->getExpenseTypeData($expenses),
             'secretaries' => $this->getSecretariesData($expenses),
             'departmentsData' => $this->getDepartmentsData($expenses),
-            'monthlyBudget' => $monthlyBudget,
-            'capValue' => $capValue,
+            'monthlyBudget' => $monthlyBudget,   // Orçamento padrão
+            'capValue' => $capValue,        // Teto efetivo
+            'capSource' => $capSource,       // Origem do teto
             'referenceStartDate' => $referenceStartDate->format('Y-m-d'),
             'referenceEndDate' => $referenceEndDate->format('Y-m-d'),
         ]);
     }
 
-    // Método auxiliar (adicione ao controller)
+    // ========================================================
+    // =============== MÉTODOS AUXILIARES =====================
+    // ========================================================
+
     private function getDepartmentsData($expenses)
     {
         return Department::with('expenses')
@@ -259,38 +272,6 @@ class DashboardController extends Controller
             })
             ->sortByDesc('total')
             ->values();
-    }
-
-
-// Helper methods (if not already existing)
-    private function getTopSecretary($expenses)
-    {
-        $secretaryTotals = $expenses->groupBy('secretary_id')
-            ->map(function ($group) {
-                return $group->sum('amount');
-            });
-
-        if ($secretaryTotals->isEmpty()) {
-            return null;
-        }
-
-        $topSecretaryId = $secretaryTotals->sortDesc()->keys()->first();
-        return Secretary::find($topSecretaryId);
-    }
-
-    private function getTopDepartment($expenses)
-    {
-        $departmentTotals = $expenses->groupBy('department_id')
-            ->map(function ($group) {
-                return $group->sum('amount');
-            });
-
-        if ($departmentTotals->isEmpty()) {
-            return null;
-        }
-
-        $topDepartmentId = $departmentTotals->sortDesc()->keys()->first();
-        return Department::find($topDepartmentId);
     }
 
     private function calculateExpensesBySecretary($secretaries)
@@ -539,7 +520,6 @@ class DashboardController extends Controller
             ->values();
     }
 
-
     public function getDashboardData()
     {
         $hierarchicalData = Secretary::with('departments.expenses')
@@ -566,6 +546,4 @@ class DashboardController extends Controller
             // outros dados necessários
         ];
     }
-
-
 }

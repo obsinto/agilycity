@@ -75,31 +75,72 @@ function formatCurrencyInternal(value) {
  * @param {number} value - Valor atual de despesas do mês
  * @param {number} capValue - Valor do teto de gastos
  */
-export function renderGaugeChart(selector, value, capValue) {
+export function renderGaugeChart(selector, value, capValue, capSource = 'none') {
+    // capSource pode ser:
+    //  - 'specific':   teto específico para o filtro atual
+    //  - 'macro':      teto genérico (macro) da secretaria
+    //  - 'none':       não há teto algum definido
+
     const chartDom = document.getElementById(selector);
     if (!chartDom) return;
 
-    // Garantir que os valores sejam números
+    // Garante que "value" seja número; se não for, vira 0
     value = parseFloat(value) || 0;
-    capValue = parseFloat(capValue) || 100000; // Usar 100000 como fallback se for 0 ou inválido
 
-    // Calcular a porcentagem de uso
-    const percentage = (value / capValue) * 100;
+    // Se não houver teto (capSource = 'none'), podemos definir capValue como 0
+    // e tratar depois no gauge. Caso contrário, usa o que vier (teto específico ou macro).
+    let useGauge = true; // Flag para indicar se vamos desenhar o gauge "normal"
+    if (capSource === 'none') {
+        capValue = 0;
+        useGauge = false;
+    } else {
+        capValue = parseFloat(capValue) || 0;
+        // Se por alguma razão ainda for 0, tratamos como 'none'
+        if (capValue <= 0) {
+            useGauge = false;
+        }
+    }
 
     // Limpa qualquer gráfico existente
     echarts.dispose(chartDom);
     const myChart = echarts.init(chartDom);
 
-    // Log do cálculo para depuração
-    console.log(`Gauge: ${formatCurrencyInternal(value)} / ${formatCurrencyInternal(capValue)} = ${percentage.toFixed(1)}%`);
+    // Se tivermos um teto válido (> 0), calculamos o percentual
+    let percentage = 0;
+    if (useGauge) {
+        percentage = (value / capValue) * 100;
+    }
+
+    // Preparação do label e tooltip
+    let gaugeLabel = '';
+    let tooltipText = '';
+
+    if (!useGauge) {
+        // Caso "nenhum teto": mostramos mensagem de "N/A" ou equivalente
+        gaugeLabel = 'Nenhum\nteto\ndefinido';
+        tooltipText = 'Nenhum teto definido para o filtro atual';
+    } else {
+        // Se temos teto, montamos o label normal + alguma indicação da origem (capSource)
+        gaugeLabel = `${percentage.toFixed(0)}%\n${formatCurrencyInternal(value)}`;
+
+        // Exemplo: se for macro, avisamos no tooltip que é “teto geral”
+        if (capSource === 'macro') {
+            tooltipText = `Usando teto geral da Secretaria: ${formatCurrencyInternal(capValue)}<br/>
+                           Gasto Atual: ${formatCurrencyInternal(value)}<br/>
+                           Utilizado: ${percentage.toFixed(1)}%`;
+        } else {
+            // Se for específico
+            tooltipText = `Orçamento Mensal<br/>
+                           Teto: ${formatCurrencyInternal(capValue)}<br/>
+                           Gasto Atual: ${formatCurrencyInternal(value)}<br/>
+                           Utilizado: ${percentage.toFixed(1)}%`;
+        }
+    }
 
     const option = {
         tooltip: {
-            formatter: function (params) {
-                return `Orçamento Mensal<br/>
-                       Gasto Atual: ${formatCurrencyInternal(value)}<br/>
-                       Teto: ${formatCurrencyInternal(capValue)}<br/>
-                       Utilizado: ${percentage.toFixed(1)}%`;
+            formatter: function () {
+                return tooltipText;
             }
         },
         series: [
@@ -117,8 +158,10 @@ export function renderGaugeChart(selector, value, capValue) {
                     fontSize: 10
                 },
                 detail: {
+                    // Se não há teto, exibimos "Nenhum teto definido"
+                    // Se há teto, exibimos "XX% / valor"
                     formatter: function () {
-                        return `${percentage.toFixed(0)}%\n${formatCurrencyInternal(value)}`;
+                        return gaugeLabel;
                     },
                     offsetCenter: [0, '60%'],
                     style: {
@@ -128,7 +171,8 @@ export function renderGaugeChart(selector, value, capValue) {
                     }
                 },
                 data: [{
-                    value: percentage,
+                    // Se não há teto, deixamos pointer em 0
+                    value: useGauge ? percentage : 0,
                     name: 'Gastos'
                 }],
                 title: {
@@ -146,6 +190,7 @@ export function renderGaugeChart(selector, value, capValue) {
                     }
                 },
                 pointer: {
+                    show: useGauge, // Se não há teto, podemos até esconder o ponteiro
                     itemStyle: {
                         color: 'auto'
                     }
@@ -156,7 +201,7 @@ export function renderGaugeChart(selector, value, capValue) {
 
     myChart.setOption(option);
 
-    // Torna o gráfico responsivo
+    // Responsividade
     window.addEventListener('resize', function () {
         myChart.resize();
     });

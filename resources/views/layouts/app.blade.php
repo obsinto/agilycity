@@ -8,7 +8,8 @@
 
     {{-- Carrega CSS e JS principal via Vite --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    
+    <script src="https://unpkg.com/alpinejs" defer></script>
+
 </head>
 <body class="bg-gray-100 h-screen">
 <div class="flex">
@@ -28,7 +29,8 @@
                              class="h-10 w-10 rounded-full object-cover"
                              onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
                     @else
-                        <div class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                        <div
+                            class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
                             {{ substr(auth()->user()->name, 0, 1) }}
                         </div>
                     @endif
@@ -56,7 +58,7 @@
                 </li>
 
                 <!-- Itens visíveis para secretários e líderes de setor -->
-                @if(auth()->user()->hasRole('secretary') || auth()->user()->hasRole('sector_leader'))
+                @if(auth()->user()->hasAnyRole(['secretary', 'sector_leader']))
                     <li>
                         <a href="{{ route('expense-types.index') }}"
                            class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('expense-types.*') ? 'bg-gray-100' : '' }}">
@@ -67,6 +69,59 @@
                         <a href="{{ route('expenses.index') }}"
                            class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('expenses.*') ? 'bg-gray-100' : '' }}">
                             Despesas
+                        </a>
+                    </li>
+                @endif
+
+                <!-- Análise Escolar:
+                     Somente se for prefeito OU (sector_leader E dept->is_school)
+                -->
+                @if(
+                    auth()->user()->hasRole('mayor') ||
+                    (
+                        auth()->user()->hasRole('sector_leader') &&
+                        auth()->user()->department &&
+                        auth()->user()->department->is_school
+                    )
+                )
+                    <li>
+                        <a href="{{ route('reports.students') }}"
+                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('reports.students') ? 'bg-gray-100' : '' }}">
+                            Análise Escolar
+                        </a>
+                    </li>
+                @endif
+
+                <!-- Relatório Cantina:
+                     Somente se for prefeito OU (sector_leader E dept->is_school)
+                -->
+                @if(
+                    auth()->user()->hasRole('mayor') ||
+                    (
+                        auth()->user()->hasRole('sector_leader') &&
+                        auth()->user()->department &&
+                        auth()->user()->department->is_school
+                    )
+                )
+                    <li>
+                        <a href="{{ route('cantina.report') }}"
+                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('cantina.report') ? 'bg-gray-100' : '' }}">
+                            Relatório Cantina
+                        </a>
+                    </li>
+                @endif
+
+                <!--
+                     Botão "Cadastrar Alunos"
+                     Exibe somente se for sector_leader e dept->is_school
+                -->
+                @if(auth()->user()->hasRole('sector_leader')
+                    && auth()->user()->department
+                    && auth()->user()->department->is_school)
+                    <li>
+                        <a href="{{ route('enrollments.create') }}"
+                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('enrollments.create') ? 'bg-gray-100' : '' }}">
+                            Cadastrar Alunos
                         </a>
                     </li>
                 @endif
