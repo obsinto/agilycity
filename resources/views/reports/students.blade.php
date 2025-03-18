@@ -26,16 +26,19 @@
             <div>
                 <label for="department_id" class="block text-sm font-medium text-gray-700">Escola</label>
                 <select name="department_id" id="department_id"
-                        class="mt-1 w-64 border border-gray-300 rounded p-1">
-                    <option value="">Todas</option>
+                        class="mt-1 w-64 border border-gray-300 rounded p-1"
+                    {{ auth()->user()->hasRole('mayor') || auth()->user()->can('view all schools') ? '' : 'disabled' }}>
+                    @if(auth()->user()->hasRole('mayor') || auth()->user()->can('view all schools'))
+                        <option value="">Todas</option>
+                    @endif
                     @foreach($allSchools as $school)
-                        <option value="{{ $school->id }}"
-                            {{ $departmentId == $school->id ? 'selected' : '' }}>
+                        <option value="{{ $school->id }}" {{ $departmentId == $school->id ? 'selected' : '' }}>
                             {{ $school->name }}
                         </option>
                     @endforeach
                 </select>
             </div>
+
 
             <!-- Botão Filtrar -->
             <div>

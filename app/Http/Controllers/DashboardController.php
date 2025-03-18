@@ -28,6 +28,26 @@ class DashboardController extends Controller
 
         $user = Auth::user();
 
+        // Redireciona para o dashboard apropriado com base no papel do usuário
+        if ($user->hasRole('mayor')) {
+            return redirect()->route('mayor.dashboard');
+        } elseif ($user->hasRole('secretary')) {
+            return redirect()->route('secretary.dashboard');
+        } elseif ($user->hasRole('sector_leader')) {
+            return redirect()->route('sector.dashboard');
+        }
+
+        return view('dashboard.default');
+    }
+
+    public function mayorDashboard()
+    {
+        if (!Auth::check()) {
+            return redirect()->route('login');
+        }
+
+        $user = Auth::user();
+
         if ($user->hasRole('mayor')) {
             // Consulta base com todas as despesas e eager loading
             $expenses = Expense::with(['secretary', 'department', 'expenseType'])->get();
@@ -546,4 +566,93 @@ class DashboardController extends Controller
             // outros dados necessários
         ];
     }
+
+
+    public function secretaryDashboard()
+    {
+        $user = Auth::user();
+
+        // Verifica se o usuário tem uma secretaria associada
+        if (!$user->secretary) {
+            return redirect()->route('dashboard')->with('error', 'Secretaria não encontrada');
+        }
+
+        $secretary = $user->secretary;
+
+        // Carrega os departamentos e suas despesas em uma única consulta
+        $departments = Department::where('secretary_id', $secretary->id)
+            ->with(['expenses' => function ($query) {
+                $query->where('expense_date', '>=', now()->subYear()); // Filtra despesas do último ano
+            }])
+            ->get();
+
+        // Tipos de despesa
+        $expenseTypes = ExpenseType::all();
+
+        // Despesas da secretaria (todos os departamentos)
+        $expenses = $departments->flatMap->expenses;
+
+        // Total de gastos
+        $totalExpenses = $expenses->sum('amount');
+
+        // Gastos do mês atual
+        $currentMonthExpenses = $expenses->filter(function ($expense) {
+            return $expense->expense_date->format('Y-m') === now()->format('Y-m');
+        })->sum('amount');
+
+        // Gastos do mês anterior
+        $lastMonthExpenses = $expenses->filter(function ($expense) {
+            return $expense->expense_date->format('Y-m') === now()->subMonth()->format('Y-m');
+        })->sum('amount');
+
+        // Departamento com maior gasto
+        $topDepartment = $departments->sortByDesc(function ($department) {
+            return $department->expenses->sum('amount');
+        })->first();
+
+        // Dados para o gráfico de Evolução Mensal
+        $monthlyExpenses = $this->getMonthlyExpenses($secretary->id);
+
+        return view('dashboard.secretary', compact(
+            'secretary',
+            'departments',
+            'expenseTypes',
+            'totalExpenses',
+            'currentMonthExpenses',
+            'lastMonthExpenses',
+            'topDepartment',
+            'monthlyExpenses'
+        ));
+    }
+
+    /**
+     * Retorna as despesas mensais da secretaria para o gráfico de Evolução Mensal
+     */
+    private function getMonthlyExpenses($secretaryId)
+    {
+        return Expense::whereHas('department', function ($query) use ($secretaryId) {
+            $query->where('secretary_id', $secretaryId);
+        })
+            ->selectRaw('YEAR(expense_date) as year, MONTH(expense_date) as month, SUM(amount) as total')
+            ->groupBy('year', 'month')
+            ->orderBy('year')
+            ->orderBy('month')
+            ->get();
+    }
+
+
+    public function sectorLeaderDashboard()
+    {
+        $user = Auth::user();
+        $department = $user->department; // Assumindo que existe uma relação 'department' no modelo User
+
+        if (!$department) {
+            return redirect()->route('dashboard')->with('error', 'Departamento não encontrado');
+        }
+
+        // Aqui você pode adicionar a lógica específica para o dashboard do líder de setor
+
+        return view('dashboard.sector_leader', compact('department'));
+    }
+
 }

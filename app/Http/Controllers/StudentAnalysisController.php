@@ -16,88 +16,61 @@ class StudentAnalysisController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-
-        // Filtro de ano (padrão: ano atual)
         $year = $request->input('year', now()->year);
-
-        // (Opcional) Filtro para uma escola específica
-        // se o usuário for prefeito ou secretário (ex.: para dropdown).
-        // Se não usar esse filtro, pode remover esta linha e o where correspondente.
         $departmentId = $request->input('department_id');
 
-        // Monta uma lista com todas as escolas, caso precise exibir em um <select>
+        // Obter todas as escolas, mas restringir caso o usuário não seja prefeito ou secretário de educação
         $allSchools = Department::where('is_school', true)
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        // Base da query: somente departamentos que sejam escolas
+        // Filtrar departamentos conforme a permissão do usuário
+        if (!$user->hasRole('mayor') && !$user->can('view all schools')) {
+            // Se não for prefeito nem secretário de educação, só pode ver sua própria escola
+            $allSchools->where('id', $user->department_id);
+            $departmentId = $user->department_id; // Força a seleção da própria escola
+        }
+
+        $allSchools = $allSchools->get();
+
+        // Buscar apenas as escolas que o usuário pode ver
         $departmentsQuery = Department::where('is_school', true);
 
-        // 1) Se for sector_leader, filtra somente o departamento do próprio usuário
-        if ($user->hasRole('sector_leader')) {
+        if (!$user->hasRole('mayor') && !$user->can('view all schools')) {
             $departmentsQuery->where('id', $user->department_id);
-
-            // 2) Se for secretary ou mayor, podemos aplicar um filtro de escola (opcional)
-        } else {
-            // Se foi selecionada uma escola específica (department_id),
-            // filtra somente ela. Se preferir não filtrar, basta comentar esse if.
-            if ($departmentId) {
-                $departmentsQuery->where('id', $departmentId);
-            }
+        } elseif ($departmentId) {
+            $departmentsQuery->where('id', $departmentId);
         }
 
-        // Executa a query final de departamentos (escolas)
         $departments = $departmentsQuery->orderBy('name')->get();
 
-        // Montar dados para gráfico e tabela
-        // Array com rótulos dos 12 meses
-        $monthsLabels = [];
-        for ($m = 1; $m <= 12; $m++) {
-            // Ex.: ["Jan","Feb","Mar",...]
-            $monthsLabels[] = Carbon::createFromDate($year, $m, 1)->format('M');
-        }
+        // Preparação de dados para gráfico e tabela
+        $monthsLabels = collect(range(1, 12))->map(fn($m) => Carbon::createFromDate($year, $m, 1)->format('M'));
 
-        // Arrays que a view usará
-        $chartData = []; // para o gráfico (ECharts)
-        $tableData = []; // para a tabela detalhada
+        $chartData = [];
+        $tableData = [];
 
         foreach ($departments as $dept) {
-            // Buscar as matrículas do ano para este dept
-            // e indexar por mês (keyBy('month'))
             $enrollments = DepartmentEnrollment::where('department_id', $dept->id)
                 ->where('year', $year)
                 ->select('month', 'students_count')
                 ->get()
                 ->keyBy('month');
 
-            // Array de 12 posições (1..12) => contagem de alunos ou 0
-            $monthlyCounts = [];
-            for ($m = 1; $m <= 12; $m++) {
-                $monthlyCounts[$m] = $enrollments[$m]->students_count ?? 0;
-            }
+            $monthlyCounts = collect(range(1, 12))->mapWithKeys(fn($m) => [$m => $enrollments[$m]->students_count ?? 0]);
 
-            // Montar série para o gráfico
             $chartData[] = [
                 'name' => $dept->name,
-                'data' => array_values($monthlyCounts),
+                'data' => $monthlyCounts->values()->toArray(),
             ];
 
-            // Montar dados para a tabela
             $tableData[] = [
                 'department' => $dept->name,
                 'counts' => $monthlyCounts,
-                'yearly_sum' => array_sum($monthlyCounts),
+                'yearly_sum' => $monthlyCounts->sum(),
             ];
         }
 
-        // Retorna a view, passando tudo que a Blade precisa
-        return view('reports.students', [
-            'year' => $year,
-            'departmentId' => $departmentId, // se quiser exibir o select filtrado
-            'allSchools' => $allSchools,   // lista de escolas pro <select>
-            'monthsLabels' => $monthsLabels,
-            'chartData' => $chartData,
-            'tableData' => $tableData,
-        ]);
+        return view('reports.students', compact('year', 'departmentId', 'allSchools', 'monthsLabels', 'chartData', 'tableData'));
     }
+
 }

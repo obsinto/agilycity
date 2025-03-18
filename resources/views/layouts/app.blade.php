@@ -9,7 +9,6 @@
     {{-- Carrega CSS e JS principal via Vite --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script src="https://unpkg.com/alpinejs" defer></script>
-
 </head>
 <body class="bg-gray-100 h-screen">
 <div class="flex">
@@ -30,7 +29,7 @@
                              onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
                     @else
                         <div
-                            class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                                class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
                             {{ substr(auth()->user()->name, 0, 1) }}
                         </div>
                     @endif
@@ -46,129 +45,139 @@
             </div>
         </div>
 
-        <!-- Menu de Navegação -->
+        <!-- Menu de
+        Navegação -->
         <nav class="mt-4 flex-1">
             <ul>
-                <!-- Dashboard (visível para todos) -->
-                <li>
-                    <a href="{{ route('dashboard') }}"
-                       class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('dashboard') ? 'bg-gray-100' : '' }}">
-                        Dashboard
-                    </a>
-                </li>
-
-                <!-- Itens visíveis para secretários e líderes de setor -->
-                @if(auth()->user()->hasAnyRole(['secretary', 'sector_leader']))
+                <!-- Dashboard -->
+                @can('view dashboard')
                     <li>
-                        <a href="{{ route('expense-types.index') }}"
-                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('expense-types.*') ? 'bg-gray-100' : '' }}">
-                            Tipos de Despesas
+                        <a href="{{ auth()->user()->hasAnyRole(['secretary', 'education_secretary']) ? route('secretary.dashboard') : route('mayor.dashboard') }}"
+                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('dashboard') || request()->routeIs('secretary.dashboard') ? 'bg-gray-100' : '' }}">
+                            Dashboard
                         </a>
                     </li>
-                    <li>
-                        <a href="{{ route('expenses.index') }}"
-                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('expenses.*') ? 'bg-gray-100' : '' }}">
-                            Despesas
-                        </a>
-                    </li>
-                @endif
+                @endcan
 
-                <!-- Análise Escolar:
-                     Somente se for prefeito OU (sector_leader E dept->is_school)
-                -->
-                @if(
-                    auth()->user()->hasRole('mayor') ||
-                    (
-                        auth()->user()->hasRole('sector_leader') &&
-                        auth()->user()->department &&
-                        auth()->user()->department->is_school
-                    )
-                )
+                <!-- Tipos de Despesas (não visível para mayor) -->
+                @can('manage departments')
+                    @if(!auth()->user()->hasRole('mayor'))
+                        <li>
+                            <a href="{{ route('expense-types.index') }}"
+                               class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('expense-types.*') ? 'bg-gray-100' : '' }}">
+                                Tipos de Despesas
+                            </a>
+                        </li>
+                    @endif
+                @endcan
+
+                <!-- Despesas (não visível para mayor) -->
+                @can('manage departments')
+                    @if(!auth()->user()->hasRole('mayor'))
+                        <li>
+                            <a href="{{ route('expenses.index') }}"
+                               class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('expenses.*') ? 'bg-gray-100' : '' }}">
+                                Despesas
+                            </a>
+                        </li>
+                    @endif
+                @endcan
+
+                <!-- Análise Escolar -->
+                @can('view all schools')
                     <li>
                         <a href="{{ route('reports.students') }}"
                            class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('reports.students') ? 'bg-gray-100' : '' }}">
                             Análise Escolar
                         </a>
                     </li>
-                @endif
+                @endcan
 
-                <!-- Relatório Cantina:
-                     Somente se for prefeito OU (sector_leader E dept->is_school)
-                -->
-                @if(
-                    auth()->user()->hasRole('mayor') ||
-                    (
-                        auth()->user()->hasRole('sector_leader') &&
-                        auth()->user()->department &&
-                        auth()->user()->department->is_school
-                    )
-                )
+                <!-- Relatório Cantina -->
+                @can('view cantina report')
                     <li>
                         <a href="{{ route('cantina.report') }}"
                            class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('cantina.report') ? 'bg-gray-100' : '' }}">
                             Relatório Cantina
                         </a>
                     </li>
+                @endcan
+
+                <!-- Cadastrar Alunos (apenas para sector_leader de escola) -->
+                @if(auth()->user()->hasRole('sector_leader') && auth()->user()->department && auth()->user()->department->is_school)
+                    @can('manage students')
+                        <li>
+                            <a href="{{ route('enrollments.create') }}"
+                               class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('enrollments.create') ? 'bg-gray-100' : '' }}">
+                                Cadastrar Alunos
+                            </a>
+                        </li>
+                    @endcan
                 @endif
 
-                <!--
-                     Botão "Cadastrar Alunos"
-                     Exibe somente se for sector_leader e dept->is_school
-                -->
-                @if(auth()->user()->hasRole('sector_leader')
-                    && auth()->user()->department
-                    && auth()->user()->department->is_school)
+                <!-- Associar Líderes (não visível para mayor) -->
+                @can('manage users')
+                    @if(!auth()->user()->hasRole('mayor'))
+                        <li>
+                            <a href="{{ route('secretary.sector-leaders') }}"
+                               class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('secretary.sector-leaders') ? 'bg-gray-100' : '' }}">
+                                Associar Líderes
+                            </a>
+                        </li>
+                    @endif
+                @endcan
+
+                <!-- Gerenciar Departamentos (não visível para mayor) -->
+                @can('manage departments')
+                    @if(!auth()->user()->hasRole('mayor'))
+                        <li>
+                            <a href="{{ route('secretary.departments') }}"
+                               class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('secretary.departments') ? 'bg-gray-100' : '' }}">
+                                Gerenciar Departamentos
+                            </a>
+                        </li>
+                    @endif
+                @endcan
+
+                <!-- Credenciais Líderes -->
+                @can('manage users')
                     <li>
-                        <a href="{{ route('enrollments.create') }}"
-                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('enrollments.create') ? 'bg-gray-100' : '' }}">
-                            Cadastrar Alunos
+                        <a href="{{ route('credentials.index') }}"
+                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('credentials.*') ? 'bg-gray-100' : '' }}">
+                            Credenciais Líderes
                         </a>
                     </li>
-                @endif
+                @endcan
 
-                <!-- Itens específicos para secretários -->
-                @role('secretary')
-                <li>
-                    <a href="{{ route('secretary.sector-leaders') }}"
-                       class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('secretary.sector-leaders') ? 'bg-gray-100' : '' }}">
-                        Associar Líderes
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('secretary.departments') }}"
-                       class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('secretary.departments') ? 'bg-gray-100' : '' }}">
-                        Gerenciar Departamentos
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('credentials.index') }}"
-                       class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('credentials.*') ? 'bg-gray-100' : '' }}">
-                        Credenciais Líderes
-                    </a>
-                </li>
-                @endrole
+                <!-- Credenciais Secretários -->
+                @can('manage secretaries')
+                    <li>
+                        <a href="{{ route('credentials.index') }}"
+                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('credentials.*') ? 'bg-gray-100' : '' }}">
+                            Credenciais Secretários
+                        </a>
+                    </li>
+                @endcan
 
-                <!-- Itens específicos para prefeito -->
-                @role('mayor')
-                <li>
-                    <a href="{{ route('credentials.index') }}"
-                       class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('credentials.*') ? 'bg-gray-100' : '' }}">
-                        Credenciais Secretários
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('secretaries.manage') }}"
-                       class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('secretaries.manage') ? 'bg-gray-100' : '' }}">
-                        Gerenciar Secretários
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ route('spending-caps.index') }}"
-                       class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('spending-caps.*') ? 'bg-gray-100' : '' }}">
-                        Teto de Gastos
-                    </a>
-                </li>
-                @endrole
+                <!-- Gerenciar Secretários -->
+                @can('manage secretaries')
+                    <li>
+                        <a href="{{ route('secretaries.manage') }}"
+                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('secretaries.manage') ? 'bg-gray-100' : '' }}">
+                            Gerenciar Secretários
+                        </a>
+                    </li>
+                @endcan
+
+                <!-- Teto de Gastos -->
+                @can('view financial dashboard')
+                    <li>
+                        <a href="{{ route('spending-caps.index') }}"
+                           class="block py-2 px-4 hover:bg-gray-100 {{ request()->routeIs('spending-caps.*') ? 'bg-gray-100' : '' }}">
+                            Teto de Gastos
+                        </a>
+                    </li>
+                @endcan
             </ul>
         </nav>
 
