@@ -1,0 +1,62 @@
+version: '3.8'
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    image: nginx-agilycity-itagi:1.0
+    container_name: nginx-agilycity-itagi
+    volumes:
+      - ./:/var/www
+      - /var/www/vendor  # Protege o vendor
+      - /var/www/node_modules  # Protege o node_modules
+    ports:
+      - "8888:80"  # Expõe o Nginx diretamente na porta 8888
+    depends_on:
+      - php
+    restart: unless-stopped
+    networks:
+      - agilycity_network
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    image: php-agilycity-itagi:1.0
+    container_name: php-agilycity-itagi
+    volumes:
+      - ./:/var/www
+      - /var/www/vendor  # Protege o vendor
+      - /var/www/node_modules  # Protege o node_modules
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - agilycity_network
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-agilycity-itagi
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-eJ2p$8Lm9Kd^3xQz!7RvT}
+      MYSQL_DATABASE: ${DB_DATABASE:-laravel}
+      MYSQL_USER: ${DB_USERNAME:-laravel}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-Tz5@Fq8Xw2Dp7&LkN9Js}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3310:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - agilycity_network
+
+volumes:
+  mysql_data:
+
+networks:
+  agilycity_network:
