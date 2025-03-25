@@ -36,20 +36,8 @@ RUN mkdir -p /var/www/storage/framework/sessions \
     && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache \
     && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
-# Copiar arquivo .env de exemplo e gerar chave
-RUN cp .env.example .env \
-    && sed -i 's/APP_ENV=local/APP_ENV=production/g' .env \
-    && sed -i 's/APP_DEBUG=true/APP_DEBUG=false/g' .env \
-    && sed -i 's/DB_HOST=127.0.0.1/DB_HOST=mysql/g' .env \
-    && sed -i 's/SESSION_DRIVER=database/SESSION_DRIVER=file/g' .env \
-    && sed -i 's/CACHE_DRIVER=database/CACHE_DRIVER=file/g' .env \
-    && sed -i "s|APP_URL=http://localhost|APP_URL=http://193.203.183.137:8888|g" .env
 
-# Instalar dependências do Composer
-RUN composer install --no-interaction --optimize-autoloader
 
-# Gerar chave de aplicação
-RUN php artisan key:generate --force
 
 # Instalar dependências do NPM e compilar assets
 RUN npm install

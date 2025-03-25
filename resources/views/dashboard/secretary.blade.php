@@ -202,7 +202,7 @@
 @endpush
 
 @push('scripts')
-    @vite('resources/js/dashboard/index.js')
+    @vite('resources/js/components/dashboard/index.js')
 
     <script>
         /**

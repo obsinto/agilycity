@@ -285,7 +285,7 @@
 
 @push('scripts')
     {{-- Importa o arquivo principal do dashboard (resources/js/dashboard/index.js) via Vite --}}
-    @vite('resources/js/dashboard/index.js')
+    @vite('resources/js/components/dashboard/index.js')
 
     <script>
         /**
