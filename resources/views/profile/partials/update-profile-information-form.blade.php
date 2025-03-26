@@ -1,10 +1,12 @@
+{{-- resources/views/profile/partials/update-profile-information-form.blade.php --}}
 <section>
     <header>
         <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Informações do Perfil') }}
+            Informações do Perfil
         </h2>
+
         <p class="mt-1 text-sm text-gray-600">
-            {{ __("Atualize suas informações de perfil e endereço de email.") }}
+            Atualize as informações do seu perfil, senha e endereço de e-mail.
         </p>
     </header>
 
@@ -12,97 +14,164 @@
         @csrf
     </form>
 
+    <!-- Notificações de sucesso e erro -->
+    @if(session('success'))
+        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
+            <p>{{ session('success') }}</p>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+            <p>{{ session('error') }}</p>
+        </div>
+    @endif
+
     <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6" enctype="multipart/form-data">
         @csrf
         @method('patch')
 
-        <div class="flex items-center gap-4">
-            <div class="relative">
-                @if(auth()->user()->avatar)
-                    <img id="avatar-preview"
-                         src="{{ Storage::url(auth()->user()->avatar) }}"
-                         class="w-20 h-20 rounded-full object-cover"
-                         onerror="this.onerror=null; this.parentElement.innerHTML = '<div class=\'w-20 h-20 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xl\'>' + '{{ substr(auth()->user()->name, 0, 1) }}' + '</div>';">
-                @else
-                    <div id="avatar-preview"
-                         class="w-20 h-20 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xl">
-                        {{ substr(auth()->user()->name, 0, 1) }}
-                    </div>
-                @endif
-
-                <label for="avatar"
-                       class="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow cursor-pointer hover:bg-gray-100">
-                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-                        <path stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                </label>
-                <input type="file"
-                       id="avatar"
-                       name="avatar"
-                       class="hidden"
-                       accept="image/*"
-                       onchange="previewImage(this)">
+        <!-- Avatar -->
+        <div>
+            <label for="avatar" class="block text-sm font-medium text-gray-700">Avatar</label>
+            <div class="mt-1 flex items-center space-x-3">
+                <div class="flex-shrink-0">
+                    @if(auth()->user()->avatar)
+                        <img src="{{ Storage::url(auth()->user()->avatar) }}"
+                             alt="Avatar"
+                             class="h-16 w-16 rounded-full object-cover"
+                             id="avatar-preview">
+                    @else
+                        <div class="h-16 w-16 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg"
+                             id="avatar-placeholder">
+                            {{ substr(auth()->user()->name, 0, 1) }}
+                        </div>
+                        <img src="" alt="Avatar" class="h-16 w-16 rounded-full object-cover hidden" id="avatar-preview">
+                    @endif
+                </div>
+                <div class="flex flex-col space-y-2">
+                    <input type="file"
+                           name="avatar"
+                           id="avatar"
+                           class="sr-only"
+                           accept="image/*"
+                           onchange="previewImage()">
+                    <label for="avatar"
+                           class="cursor-pointer py-1 px-3 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        Alterar
+                    </label>
+                    @if(auth()->user()->avatar)
+                        <button type="button"
+                                class="py-1 px-3 border border-gray-300 rounded-md text-sm font-medium text-red-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                onclick="removeAvatar()">
+                            Remover
+                        </button>
+                    @endif
+                </div>
             </div>
-            @if(auth()->user()->avatar)
-                <button type="button" onclick="removeAvatar()" class="text-sm text-red-600 hover:text-red-800">Remover
-                    Foto
-                </button>
-            @endif
+            @error('avatar')
+            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+            @enderror
         </div>
 
+        <!-- Name -->
         <div>
-            <x-input-label for="name" :value="__('Nome')"/>
-            <x-text-input id="name"
-                          name="name"
-                          type="text"
-                          class="mt-1 block w-full"
-                          :value="old('name', $user->name)"
-                          required
-                          autofocus
-                          autocomplete="name"/>
-            <x-input-error class="mt-2" :messages="$errors->get('name')"/>
+            <label for="name" class="block text-sm font-medium text-gray-700">Nome</label>
+            <input id="name"
+                   name="name"
+                   type="text"
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                   value="{{ old('name', $user->name) }}"
+                   required
+                   autofocus/>
+            @error('name')
+            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+            @enderror
         </div>
 
+        <!-- CPF -->
         <div>
-            <x-input-label for="email" :value="__('Email')"/>
-            <x-text-input id="email"
-                          name="email"
-                          type="email"
-                          class="mt-1 block w-full"
-                          :value="old('email', $user->email)"
-                          required
-                          autocomplete="username"/>
-            <x-input-error class="mt-2" :messages="$errors->get('email')"/>
+            <label for="cpf" class="block text-sm font-medium text-gray-700">CPF</label>
+            <input id="cpf"
+                   name="cpf"
+                   type="text"
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                   value="{{ old('cpf', $user->cpf) }}"
+                   required
+                   maxlength="14"
+                   oninput="this.value = formatCPF(this.value)"/>
+            <p class="mt-1 text-xs text-gray-500">Formato: 000.000.000-00</p>
+            @error('cpf')
+            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <!-- Email -->
+        <div>
+            <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+            <input id="email"
+                   name="email"
+                   type="email"
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                   value="{{ old('email', $user->email) }}"
+                   required/>
+            @error('email')
+            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+            @enderror
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>
                     <p class="text-sm mt-2 text-gray-800">
-                        {{ __('Seu endereço de email não está verificado.') }}
+                        Seu endereço de e-mail não foi verificado.
 
                         <button form="send-verification"
-                                class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            {{ __('Clique aqui para reenviar o email de verificação.') }}
+                                class="underline text-sm text-blue-600 hover:text-blue-800 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Clique aqui para reenviar o e-mail de verificação.
                         </button>
                     </p>
 
                     @if (session('status') === 'verification-link-sent')
                         <p class="mt-2 font-medium text-sm text-green-600">
-                            {{ __('Um novo link de verificação foi enviado para seu endereço de email.') }}
+                            Um novo link de verificação foi enviado para o seu endereço de e-mail.
                         </p>
                     @endif
                 </div>
             @endif
         </div>
 
+        <!-- Password -->
+        <div>
+            <label for="password" class="block text-sm font-medium text-gray-700">Nova Senha</label>
+            <input id="password"
+                   name="password"
+                   type="password"
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                   placeholder="Deixe em branco para manter a senha atual"/>
+            <p class="mt-1 text-xs text-gray-500">Mínimo de 8 caracteres</p>
+            @error('password')
+            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <!-- Password Confirmation -->
+        <div>
+            <label for="password_confirmation" class="block text-sm font-medium text-gray-700">Confirmar Nova
+                Senha</label>
+            <input id="password_confirmation"
+                   name="password_confirmation"
+                   type="password"
+                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                   placeholder="Confirme a nova senha"/>
+            @error('password_confirmation')
+            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
         <div class="flex items-center gap-4">
-            <x-primary-button>{{ __('Salvar') }}</x-primary-button>
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                Salvar
+            </button>
 
             @if (session('status') === 'profile-updated')
                 <p
@@ -111,33 +180,55 @@
                     x-transition
                     x-init="setTimeout(() => show = false, 2000)"
                     class="text-sm text-gray-600"
-                >{{ __('Salvo.') }}</p>
+                >Salvo com sucesso.</p>
             @endif
         </div>
     </form>
-
 </section>
 
 <script>
-    function previewImage(input) {
+    function formatCPF(cpf) {
+        // Remove todos os caracteres não numéricos
+        cpf = cpf.replace(/\D/g, '');
+
+        // Aplica a formatação do CPF (000.000.000-00)
+        if (cpf.length <= 11) {
+            cpf = cpf.replace(/(\d{3})(\d)/, "$1.$2");
+            cpf = cpf.replace(/(\d{3})(\d)/, "$1.$2");
+            cpf = cpf.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+        } else {
+            // Limita a 11 dígitos
+            cpf = cpf.slice(0, 11);
+            cpf = cpf.replace(/(\d{3})(\d)/, "$1.$2");
+            cpf = cpf.replace(/(\d{3})(\d)/, "$1.$2");
+            cpf = cpf.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+        }
+
+        return cpf;
+    }
+
+    // Formatar CPF inicial
+    window.addEventListener('DOMContentLoaded', function () {
+        const cpfInput = document.getElementById('cpf');
+        if (cpfInput && cpfInput.value) {
+            cpfInput.value = formatCPF(cpfInput.value);
+        }
+    });
+
+    function previewImage() {
+        const input = document.getElementById('avatar');
+        const preview = document.getElementById('avatar-preview');
+        const placeholder = document.getElementById('avatar-placeholder');
+
         if (input.files && input.files[0]) {
-            var reader = new FileReader();
-            var preview = document.getElementById('avatar-preview');
+            const reader = new FileReader();
 
             reader.onload = function (e) {
-                var img = document.createElement('img');
-                img.id = 'avatar-preview';
-                img.className = 'w-20 h-20 rounded-full object-cover';
-                img.src = e.target.result;
-                img.onerror = function () {
-                    this.onerror = null;
-                    var div = document.createElement('div');
-                    div.id = 'avatar-preview';
-                    div.className = 'w-20 h-20 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xl';
-                    div.textContent = '{{ substr(auth()->user()->name, 0, 1) }}';
-                    this.parentElement.replaceChild(div, this);
-                };
-                preview.parentElement.replaceChild(img, preview);
+                preview.src = e.target.result;
+                preview.classList.remove('hidden');
+                if (placeholder) {
+                    placeholder.classList.add('hidden');
+                }
             }
 
             reader.readAsDataURL(input.files[0]);
@@ -145,43 +236,38 @@
     }
 
     function removeAvatar() {
-        if (confirm('Tem certeza que deseja remover sua foto de perfil?')) {
-            fetch('{{ route("profile.remove.avatar") }}', {
+        if (confirm('Tem certeza que deseja remover o avatar?')) {
+            fetch('{{ route('profile.remove-avatar') }}', {
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
                 body: JSON.stringify({})
             })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Erro ao remover a foto de perfil.');
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Atualiza a visualização do avatar
-                        const avatarPreview = document.getElementById('avatar-preview');
-                        avatarPreview.innerHTML = `
-                    <div class="w-20 h-20 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xl">
-                        {{ substr(auth()->user()->name, 0, 1) }}
-                        </div>
-`;
+                        const preview = document.getElementById('avatar-preview');
+                        const placeholder = document.getElementById('avatar-placeholder');
 
-                        // Remove o botão "Remover Foto"
-                        const removeButton = document.querySelector('button[onclick="removeAvatar()"]');
-                        if (removeButton) {
-                            removeButton.remove();
+                        if (!placeholder) {
+                            // Cria o placeholder se não existir
+                            const newPlaceholder = document.createElement('div');
+                            newPlaceholder.id = 'avatar-placeholder';
+                            newPlaceholder.className = 'h-16 w-16 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg';
+                            newPlaceholder.innerText = '{{ substr(auth()->user()->name, 0, 1) }}';
+
+                            preview.parentNode.insertBefore(newPlaceholder, preview);
+                        } else {
+                            placeholder.classList.remove('hidden');
                         }
-                    } else {
-                        throw new Error('Erro ao remover a foto de perfil.');
+
+                        preview.classList.add('hidden');
+
+                        // Recarrega a página para atualizar o estado
+                        window.location.reload();
                     }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    alert('Ocorreu um erro ao remover a foto de perfil. Tente novamente.');
                 });
         }
     }

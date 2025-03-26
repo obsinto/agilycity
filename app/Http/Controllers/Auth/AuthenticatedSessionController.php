@@ -30,6 +30,12 @@ class AuthenticatedSessionController extends Controller
         // Obtém o usuário autenticado
         $user = Auth::user();
 
+        // Verifica se é o primeiro acesso e marca com flag de sessão
+        if ($user->first_access) {
+            // Marca com flag de primeiro acesso na sessão
+            session()->flash('first_access', true);
+        }
+
         // Redirecionamento baseado no papel do usuário
         if ($user->hasAnyRole(['secretary', 'education_secretary'])) {
             return redirect()->intended(route('secretary.dashboard'));
@@ -42,7 +48,6 @@ class AuthenticatedSessionController extends Controller
         // Padrão para outros usuários
         return redirect()->intended(route('dashboard'));
     }
-
 
     /**
      * Destroy an authenticated session.

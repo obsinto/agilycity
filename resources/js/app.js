@@ -11,6 +11,7 @@ import 'moment/locale/pt-br';
 import ApexCharts from 'apexcharts';
 import * as echarts from 'echarts';
 import 'daterangepicker/daterangepicker.css';
+import './components/first-access';
 
 // Inicialização da aplicação
 async function initializeApp() {

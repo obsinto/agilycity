@@ -141,7 +141,7 @@
 <div class="login-container">
     <div class="logo-container">
         <div class="logo-placeholder">
-            <img src="{{ asset('storage/images/logo.jpg') }}" alt="Logo">
+            <img src="{{ asset('images/logo.jpg') }}" alt="Logo">
         </div>
     </div>
 
@@ -157,8 +157,8 @@
     <form method="POST" action="{{ route('login') }}">
         @csrf
         <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" value="{{ old('email') }}" required autofocus>
+            <label for="login">Email ou CPF</label>
+            <input type="text" id="login" name="login" value="{{ old('login') }}" required autofocus>
         </div>
 
         <div class="form-group">

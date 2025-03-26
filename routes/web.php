@@ -14,7 +14,7 @@ use App\Http\Controllers\StudentAnalysisController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return view('auth.login');
 });
 
 // Dashboard principal - redireciona para o dashboard apropriado com base no papel do usuário
@@ -39,7 +39,7 @@ Route::get('/sector-dashboard', [DashboardController::class, 'sectorLeaderDashbo
 Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
 Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-Route::post('/profile/remove-avatar', [ProfileController::class, 'removeAvatar'])->name('profile.remove.avatar');
+Route::post('/profile/remove-avatar', [ProfileController::class, 'removeAvatar'])->name('profile.remove-avatar');
 
 Route::get('/secretaries/manage', [SecretaryManagementController::class, 'index'])
     ->middleware('permission:manage secretaries')
