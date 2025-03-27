@@ -38,4 +38,11 @@ class Expense extends Model
     {
         return $this->belongsTo(Secretary::class);
     }
+
+    public function scopeMealRelated($query)
+    {
+        return $query->whereHas('expenseType', function ($q) {
+            $q->where('is_meal_related', true);
+        });
+    }
 }

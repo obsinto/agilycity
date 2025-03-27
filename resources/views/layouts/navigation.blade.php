@@ -40,7 +40,8 @@
                          class="h-10 w-10 rounded-full object-cover"
                          onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
                 @else
-                    <div class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                    <div
+                        class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
                         {{ substr(auth()->user()->name, 0, 1) }}
                     </div>
                 @endif
@@ -114,31 +115,33 @@
 
             <!-- Cadastro de Merenda Mensal - Visível apenas para líderes da cantina central -->
             @can('manage monthly meals')
-                <li class="relative"
-                    x-data="{ tooltip: false }"
-                    @mouseenter="tooltip = sidebarOpen ? false : true"
-                    @mouseleave="tooltip = false">
-                    <a href="{{ route('monthly-meals.index') }}"
-                       class="block py-2 hover:bg-gray-100 {{ request()->routeIs('monthly-meals.*') ? 'bg-gray-100' : '' }} flex items-center"
-                       :class="{'px-4': sidebarOpen, 'justify-center px-0': !sidebarOpen}">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                             class="h-5 w-5"
-                             :class="{'mr-3': sidebarOpen}"
-                             fill="none"
-                             viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                        <span x-show="sidebarOpen">Cadastro de Merenda</span>
-                    </a>
-                    <div x-show="tooltip"
-                         class="absolute left-full top-0 ml-2 bg-black text-white text-sm px-2 py-1 rounded z-10">
-                        Cadastro de Merenda
-                    </div>
-                </li>
+                @if(auth()->user()->hasRole('cantina_central'))
+                    <li class="relative"
+                        x-data="{ tooltip: false }"
+                        @mouseenter="tooltip = sidebarOpen ? false : true"
+                        @mouseleave="tooltip = false">
+                        <a href="{{ route('monthly-meals.index') }}"
+                           class="block py-2 hover:bg-gray-100 {{ request()->routeIs('monthly-meals.*') ? 'bg-gray-100' : '' }} flex items-center"
+                           :class="{'px-4': sidebarOpen, 'justify-center px-0': !sidebarOpen}">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-5 w-5"
+                                 :class="{'mr-3': sidebarOpen}"
+                                 fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                            <span x-show="sidebarOpen">Cadastro de Merenda</span>
+                        </a>
+                        <div x-show="tooltip"
+                             class="absolute left-full top-0 ml-2 bg-black text-white text-sm px-2 py-1 rounded z-10">
+                            Cadastro de Merenda
+                        </div>
+                    </li>
+                @endif
             @endcan
             <!-- Tipos de Despesas - Visível para secretários, líderes de setor, cantina central e líderes de escola -->
             @if(auth()->user()->hasAnyRole(['secretary', 'education_secretary', 'sector_leader']) ||
@@ -219,7 +222,8 @@
                              viewBox="0 0 24 24"
                              stroke="currentColor">
                             <path d="M12 14l9-5-9-5-9 5 9 5z"/>
-                            <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+                            <path
+                                d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
                             <path stroke-linecap="round"
                                   stroke-linejoin="round"
                                   stroke-width="2"
@@ -269,31 +273,33 @@
             <!-- Cadastrar Alunos - Visível para qualquer usuário com permissão manage students -->
             <!-- Cadastrar Alunos - Visível para qualquer usuário com permissão manage students -->
             @can('manage students')
-                <li class="relative"
-                    x-data="{ tooltip: false }"
-                    @mouseenter="tooltip = sidebarOpen ? false : true"
-                    @mouseleave="tooltip = false">
-                    <a href="{{ route('enrollments.create') }}"
-                       class="block py-2 hover:bg-gray-100 {{ request()->routeIs('enrollments.*') ? 'bg-gray-100' : '' }} flex items-center"
-                       :class="{'px-4': sidebarOpen, 'justify-center px-0': !sidebarOpen}">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                             class="h-5 w-5"
-                             :class="{'mr-3': sidebarOpen}"
-                             fill="none"
-                             viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
-                        </svg>
-                        <span x-show="sidebarOpen">Cadastrar Alunos</span>
-                    </a>
-                    <div x-show="tooltip"
-                         class="absolute left-full top-0 ml-2 bg-black text-white text-sm px-2 py-1 rounded z-10">
-                        Cadastrar Alunos
-                    </div>
-                </li>
+                @if(!auth()->user()->hasRole('mayor'))
+                    <li class="relative"
+                        x-data="{ tooltip: false }"
+                        @mouseenter="tooltip = sidebarOpen ? false : true"
+                        @mouseleave="tooltip = false">
+                        <a href="{{ route('enrollments.create') }}"
+                           class="block py-2 hover:bg-gray-100 {{ request()->routeIs('enrollments.*') ? 'bg-gray-100' : '' }} flex items-center"
+                           :class="{'px-4': sidebarOpen, 'justify-center px-0': !sidebarOpen}">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-5 w-5"
+                                 :class="{'mr-3': sidebarOpen}"
+                                 fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                            </svg>
+                            <span x-show="sidebarOpen">Cadastrar Alunos</span>
+                        </a>
+                        <div x-show="tooltip"
+                             class="absolute left-full top-0 ml-2 bg-black text-white text-sm px-2 py-1 rounded z-10">
+                            Cadastrar Alunos
+                        </div>
+                    </li>
+                @endif
             @endcan
 
 
@@ -477,7 +483,8 @@
                          class="h-10 w-10 rounded-full object-cover"
                          onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
                 @else
-                    <div class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                    <div
+                        class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
                         {{ substr(auth()->user()->name, 0, 1) }}
                     </div>
                 @endif
@@ -518,23 +525,25 @@
             @endcan
             <!-- Cadastro de Merenda Mensal Mobile -->
             @can('manage monthly meals')
-                <li>
-                    <a href="{{ route('monthly-meals.index') }}"
-                       class="block px-4 py-2 hover:bg-gray-100 {{ request()->routeIs('monthly-meals.*') ? 'bg-gray-100' : '' }} flex items-center"
-                       @click="mobileMenuOpen = false">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                             class="h-5 w-5 mr-3"
-                             fill="none"
-                             viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                        <span>Cadastro de Merenda</span>
-                    </a>
-                </li>
+                @if(!auth()->user()->hasRole('mayor'))
+                    <li>
+                        <a href="{{ route('monthly-meals.index') }}"
+                           class="block px-4 py-2 hover:bg-gray-100 {{ request()->routeIs('monthly-meals.*') ? 'bg-gray-100' : '' }} flex items-center"
+                           @click="mobileMenuOpen = false">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-5 w-5 mr-3"
+                                 fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                            <span>Cadastro de Merenda</span>
+                        </a>
+                    </li>
+                @endif
             @endcan
             <!-- Tipos de Despesas Mobile -->
             @if(auth()->user()->hasAnyRole(['secretary', 'education_secretary', 'sector_leader']) ||
@@ -595,7 +604,8 @@
                              viewBox="0 0 24 24"
                              stroke="currentColor">
                             <path d="M12 14l9-5-9-5-9 5 9 5z"/>
-                            <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998a12.078 12.078 0 01.665-6.479L12 14z"/>
+                            <path
+                                d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998a12.078 12.078 0 01.665-6.479L12 14z"/>
                             <path stroke-linecap="round"
                                   stroke-linejoin="round"
                                   stroke-width="2"

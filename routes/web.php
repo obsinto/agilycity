@@ -131,6 +131,21 @@ Route::middleware(['permission:view financial dashboard'])->group(function () {
     Route::resource('spending-caps', SpendingCapController::class);
 });
 
+
+// Rotas para o controle de merenda mensal
+
+// Rotas originais do monthly-meals
+Route::get('/monthly-meals', [MonthlyMealController::class, 'index'])
+    ->name('monthly-meals.index');
+
+Route::post('/monthly-meals', [MonthlyMealController::class, 'store'])
+    ->name('monthly-meals.store');
+
+// Nova rota para registrar despesas diretamente da tela de monthly-meals
+Route::post('/monthly-meals/expense', [MonthlyMealController::class, 'storeExpense'])
+    ->name('monthly-meals.store-expense');
+
+
 Route::get('/cantina/report', [\App\Http\Controllers\CantinaReportController::class, 'showMonthCost'])
     ->middleware('permission:view cantina report')
     ->name('cantina.report');

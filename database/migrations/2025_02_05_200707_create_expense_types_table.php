@@ -15,6 +15,7 @@ return new class extends Migration {
             $table->string('name');
             $table->text('description')->nullable();
             $table->boolean('active')->default(true);
+            $table->boolean('is_meal_related')->default(false);
             $table->timestamps();
         });
     }
