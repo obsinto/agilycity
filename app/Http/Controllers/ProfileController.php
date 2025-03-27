@@ -97,7 +97,10 @@ class ProfileController extends Controller
                 return redirect()->route('secretary.dashboard')->with($status, $message);
             } elseif ($user->hasRole('mayor')) {
                 return redirect()->route('mayor.dashboard')->with($status, $message);
+            } elseif ($user->hasAnyRole(['sector_leader', 'school_leader', 'cantina_leader']) || $user->department_id !== null) {
+                return redirect()->route('sector.dashboard')->with($status, $message);
             } else {
+                // Fallback para qualquer outro tipo de usuário
                 return redirect()->route('dashboard')->with($status, $message);
             }
         }

@@ -165,10 +165,36 @@ class DashboardController extends Controller
     /**
      * Método que filtra os dados (provavelmente chamado por AJAX).
      */
+    /**
+     * Método que filtra os dados de acordo com o papel do usuário e os filtros aplicados.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    /**
+     * Método que filtra os dados de acordo com o papel do usuário e os filtros aplicados.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function filter(Request $request)
     {
+        $user = Auth::user();
+
         // Consulta base com eager loading das relações necessárias
         $query = Expense::with(['secretary', 'department', 'expenseType']);
+
+        // Aplicar restrições de segurança baseadas no papel do usuário
+        if ($user->hasRole('secretary') && $user->secretary) {
+            // Secretário só pode ver dados de sua própria secretaria
+            $query->whereHas('department', function ($q) use ($user) {
+                $q->where('secretary_id', $user->secretary->id);
+            });
+        } elseif ($user->hasRole('sector_leader') && $user->department) {
+            // Líder de setor só pode ver dados de seu próprio departamento
+            $query->where('department_id', $user->department->id);
+        }
+        // Prefeito não tem restrições e pode ver todos os dados
 
         // Definir período de referência - padrão: mês atual
         $referenceStartDate = now()->startOfMonth();
@@ -182,9 +208,22 @@ class DashboardController extends Controller
             $query->whereBetween('expense_date', [$referenceStartDate, $referenceEndDate]);
         }
 
-        // Outros filtros
+        // Aplicar filtros adicionais (respeitando as restrições de permissão)
         if ($request->filled('department_id')) {
-            $query->where('department_id', $request->department_id);
+            // Se for secretário, verificar se o departamento pertence à sua secretaria
+            if ($user->hasRole('secretary') && $user->secretary) {
+                $departmentIds = Department::where('secretary_id', $user->secretary->id)
+                    ->pluck('id')
+                    ->toArray();
+
+                if (in_array($request->department_id, $departmentIds)) {
+                    $query->where('department_id', $request->department_id);
+                }
+            } // Se for líder de setor, ignorar o filtro pois ele já está restrito ao seu departamento
+            elseif (!$user->hasRole('sector_leader')) {
+                // Apenas prefeito pode filtrar por qualquer departamento
+                $query->where('department_id', $request->department_id);
+            }
         }
 
         if ($request->filled('expense_type')) {
@@ -194,7 +233,10 @@ class DashboardController extends Controller
         }
 
         if ($request->filled('secretary_id')) {
-            $query->where('secretary_id', $request->secretary_id);
+            // Apenas prefeito pode filtrar por secretaria
+            if (!$user->hasRole('secretary') && !$user->hasRole('sector_leader')) {
+                $query->where('secretary_id', $request->secretary_id);
+            }
         }
 
         // Executa a consulta
@@ -232,8 +274,8 @@ class DashboardController extends Controller
 
         // Monta array de filtros para o cap service
         $filters = [
-            'secretary_id' => $request->secretary_id,
-            'department_id' => $request->department_id,
+            'secretary_id' => $user->hasRole('secretary') ? $user->secretary->id : $request->secretary_id,
+            'department_id' => $user->hasRole('sector_leader') ? $user->department->id : $request->department_id,
             'expense_type' => $request->expense_type
         ];
 
@@ -251,11 +293,46 @@ class DashboardController extends Controller
             $capSource = $request->filled('expense_type') ? 'specific' : 'macro';
         }
 
+        // Cálculo de totais com base no papel do usuário
+        $totalExpenses = $expenses->sum('amount');
+
+        // Para o prefeito, oferecemos tanto o total filtrado quanto o total geral
+        $globalTotalExpenses = null;
+        $globalCurrentMonthExpenses = null;
+        $globalLastMonthExpenses = null;
+
+        if ($user->hasRole('mayor')) {
+            // Se filtros foram aplicados, oferecemos também os totais gerais sem filtros
+            if ($request->filled('secretary_id') || $request->filled('department_id') || $request->filled('expense_type') ||
+                ($request->filled('start_date') && $request->filled('end_date'))) {
+
+                $globalTotalExpenses = Expense::sum('amount');
+
+                // Cálculo do total do mês atual global
+                $currentMonth = now()->format('Y-m');
+                $globalCurrentMonthExpenses = Expense::whereRaw("DATE_FORMAT(expense_date, '%Y-%m') = ?", [$currentMonth])
+                    ->sum('amount');
+
+                // Cálculo do total do mês anterior global
+                $lastMonth = now()->subMonth()->format('Y-m');
+                $globalLastMonthExpenses = Expense::whereRaw("DATE_FORMAT(expense_date, '%Y-%m') = ?", [$lastMonth])
+                    ->sum('amount');
+            } else {
+                // Se não há filtros, os totais já são globais
+                $globalTotalExpenses = $totalExpenses;
+                $globalCurrentMonthExpenses = $currentPeriodExpenses;
+                $globalLastMonthExpenses = $lastMonthExpenses;
+            }
+        }
+
         // Retorna JSON com dados para o front-end
         return response()->json([
-            'totalExpenses' => $expenses->sum('amount'),
+            'totalExpenses' => $totalExpenses,
+            'globalTotalExpenses' => $globalTotalExpenses, // Apenas para o prefeito
             'currentMonthExpenses' => $currentPeriodExpenses,
+            'globalCurrentMonthExpenses' => $globalCurrentMonthExpenses, // Apenas para o prefeito
             'lastMonthExpenses' => $lastMonthExpenses,
+            'globalLastMonthExpenses' => $globalLastMonthExpenses, // Apenas para o prefeito
             'totalTransactions' => $expenses->count(),
             'monthlyExpenses' => $this->getMonthlyData($expenses),
             'series' => $this->calculateFilteredSeries($expenses),
@@ -268,6 +345,7 @@ class DashboardController extends Controller
             'capSource' => $capSource,       // Origem do teto
             'referenceStartDate' => $referenceStartDate->format('Y-m-d'),
             'referenceEndDate' => $referenceEndDate->format('Y-m-d'),
+            'userRole' => $user->getRoleNames()->first() // Inclui o papel do usuário para o frontend saber o que exibir
         ]);
     }
 
@@ -590,27 +668,28 @@ class DashboardController extends Controller
         $expenseTypes = ExpenseType::all();
 
         // Despesas da secretaria (todos os departamentos)
+        // Usa flatMap para combinar as coleções de despesas de todos os departamentos em uma única coleção
         $expenses = $departments->flatMap->expenses;
 
-        // Total de gastos
+        // Total de gastos - APENAS DA SECRETARIA DO USUÁRIO
         $totalExpenses = $expenses->sum('amount');
 
-        // Gastos do mês atual
+        // Gastos do mês atual - APENAS DA SECRETARIA DO USUÁRIO
         $currentMonthExpenses = $expenses->filter(function ($expense) {
             return $expense->expense_date->format('Y-m') === now()->format('Y-m');
         })->sum('amount');
 
-        // Gastos do mês anterior
+        // Gastos do mês anterior - APENAS DA SECRETARIA DO USUÁRIO
         $lastMonthExpenses = $expenses->filter(function ($expense) {
             return $expense->expense_date->format('Y-m') === now()->subMonth()->format('Y-m');
         })->sum('amount');
 
-        // Departamento com maior gasto
+        // Departamento com maior gasto - APENAS DA SECRETARIA DO USUÁRIO
         $topDepartment = $departments->sortByDesc(function ($department) {
             return $department->expenses->sum('amount');
         })->first();
 
-        // Dados para o gráfico de Evolução Mensal
+        // Dados para o gráfico de Evolução Mensal - APENAS DA SECRETARIA DO USUÁRIO
         $monthlyExpenses = $this->getMonthlyExpenses($secretary->id);
 
         return view('dashboard.secretary', compact(
@@ -641,18 +720,401 @@ class DashboardController extends Controller
     }
 
 
+    /**
+     * Dashboard para líderes de setor
+     * Exibe informações e gráficos específicos para o departamento do líder de setor
+     *
+     * @return \Illuminate\View\View
+     */
+    /**
+     * Dashboard para líderes de setor
+     * Exibe informações e gráficos específicos para o departamento do líder de setor
+     *
+     * @return \Illuminate\View\View
+     */
     public function sectorLeaderDashboard()
     {
         $user = Auth::user();
-        $department = $user->department; // Assumindo que existe uma relação 'department' no modelo User
 
-        if (!$department) {
+        // Verifica se o usuário tem um departamento associado
+        if (!$user->department) {
             return redirect()->route('dashboard')->with('error', 'Departamento não encontrado');
         }
 
-        // Aqui você pode adicionar a lógica específica para o dashboard do líder de setor
+        $department = $user->department;
 
-        return view('dashboard.sector_leader', compact('department'));
+        // Carrega APENAS as despesas do departamento específico do líder
+        $expenses = Expense::where('department_id', $department->id)
+            ->where('expense_date', '>=', now()->subYear()) // Filtra despesas do último ano
+            ->with(['expenseType'])
+            ->get();
+
+        // Tipos de despesa
+        $expenseTypes = ExpenseType::all();
+
+        // Total de gastos (apenas do departamento específico)
+        $totalExpenses = $expenses->sum('amount');
+
+        // Gastos do mês atual
+        $currentMonthExpenses = $expenses->filter(function ($expense) {
+            return $expense->expense_date->format('Y-m') === now()->format('Y-m');
+        })->sum('amount');
+
+        // Gastos do mês anterior
+        $lastMonthExpenses = $expenses->filter(function ($expense) {
+            return $expense->expense_date->format('Y-m') === now()->subMonth()->format('Y-m');
+        })->sum('amount');
+
+        // Teto de gastos (budget cap) para o departamento
+        $budgetCap = $this->expenseCapService->getCapForExpense($department->id) ??
+            config('app.default_department_budget', 15000);
+
+        // Dados para o gráfico de Evolução Mensal
+        $monthlyExpenses = $this->getMonthlyExpensesForDepartment($department->id);
+
+        // Calcular dados por tipo de despesa para o gráfico de pizza
+        $expenseTypeData = $this->getExpenseTypeDataForDepartment($expenses);
+
+        // Despesas recentes (últimas 10)
+        $recentExpenses = Expense::where('department_id', $department->id)
+            ->with('expenseType')
+            ->orderBy('expense_date', 'desc')
+            ->limit(10)
+            ->get();
+
+        return view('dashboard.sector_leader', compact(
+            'department',
+            'expenses',
+            'expenseTypes',
+            'totalExpenses',
+            'currentMonthExpenses',
+            'lastMonthExpenses',
+            'budgetCap',
+            'monthlyExpenses',
+            'expenseTypeData',
+            'recentExpenses'
+        ));
+    }
+
+    /**
+     * Retorna as despesas mensais do departamento para o gráfico de Evolução Mensal
+     *
+     * @param int $departmentId ID do departamento
+     * @return \Illuminate\Support\Collection Coleção de despesas agrupadas por mês
+     */
+    private function getMonthlyExpensesForDepartment($departmentId)
+    {
+        return Expense::where('department_id', $departmentId)
+            ->where('expense_date', '>=', now()->subYear()) // Limita aos últimos 12 meses
+            ->selectRaw('YEAR(expense_date) as year, MONTH(expense_date) as month, SUM(amount) as total')
+            ->groupBy('year', 'month')
+            ->orderBy('year')
+            ->orderBy('month')
+            ->get()
+            ->map(function ($item) {
+                // Formata o mês para ser mais amigável na exibição
+                $date = Carbon::createFromDate($item->year, $item->month, 1);
+                return [
+                    'month' => $date->format('M/Y'),
+                    'total' => $item->total,
+                    'sort_year' => $item->year,
+                    'sort_month' => $item->month
+                ];
+            });
+    }
+
+    /**
+     * Calcula os dados por tipo de despesa para o departamento
+     *
+     * @param \Illuminate\Support\Collection $expenses Coleção de despesas do departamento
+     * @return \Illuminate\Support\Collection Dados formatados para o gráfico de pizza
+     */
+    private function getExpenseTypeDataForDepartment($expenses)
+    {
+        return $expenses->groupBy('expense_type_id')
+            ->map(function ($group, $typeId) use ($expenses) {
+                $type = ExpenseType::find($typeId);
+                return [
+                    'id' => $typeId,
+                    'name' => $type ? $type->name : 'Desconhecido',
+                    'value' => $group->sum('amount'),
+                    'count' => $group->count(),
+                    'percentage' => $expenses->sum('amount') > 0
+                        ? ($group->sum('amount') / $expenses->sum('amount')) * 100
+                        : 0
+                ];
+            })
+            ->sortByDesc('value')
+            ->values();
+    }
+
+    /**
+     * Método para filtrar dados do dashboard de setor via AJAX
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function filterSectorDashboard(Request $request)
+    {
+        $user = Auth::user();
+
+        if (!$user->department) {
+            return response()->json(['error' => 'Departamento não encontrado'], 404);
+        }
+
+        $departmentId = $user->department->id;
+
+        // Consulta base
+        $query = Expense::where('department_id', $departmentId);
+
+        // Definir período de referência - padrão: mês atual
+        $referenceStartDate = now()->startOfMonth();
+        $referenceEndDate = now()->endOfMonth();
+
+        // Filtro por data
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $referenceStartDate = Carbon::createFromFormat('Y-m-d', $request->start_date)->startOfDay();
+            $referenceEndDate = Carbon::createFromFormat('Y-m-d', $request->end_date)->endOfDay();
+
+            $query->whereBetween('expense_date', [$referenceStartDate, $referenceEndDate]);
+        }
+
+        // Filtro por tipo de despesa
+        if ($request->filled('expense_type')) {
+            $query->whereHas('expenseType', function ($q) use ($request) {
+                $q->where('name', $request->expense_type);
+            });
+        }
+
+        // Executa a consulta
+        $expenses = $query->with('expenseType')->get();
+
+        // Calcula dados para períodos atual e anterior
+        $currentPeriodStart = $referenceStartDate->copy();
+        $currentPeriodEnd = $referenceEndDate->copy();
+
+        // Calcula o tamanho do período para poder comparar com "período anterior"
+        $periodLength = $currentPeriodEnd->diffInDays($currentPeriodStart) + 1;
+        $previousPeriodEnd = $currentPeriodStart->copy()->subDay();
+        $previousPeriodStart = $previousPeriodEnd->copy()->subDays($periodLength - 1);
+
+        // Soma das despesas no período atual
+        $currentPeriodExpenses = $expenses->filter(function ($expense) use ($currentPeriodStart, $currentPeriodEnd) {
+            return $expense->expense_date >= $currentPeriodStart && $expense->expense_date <= $currentPeriodEnd;
+        })->sum('amount');
+
+        // Soma das despesas no período anterior
+        $previousPeriodExpenses = Expense::where('department_id', $departmentId)
+            ->whereBetween('expense_date', [$previousPeriodStart, $previousPeriodEnd])
+            ->sum('amount');
+
+        // Teto de gastos
+        $budgetCap = $this->expenseCapService->getCapForExpense($departmentId) ??
+            config('app.default_department_budget', 15000);
+
+        // Retorna JSON com dados para o front-end
+        return response()->json([
+            'totalExpenses' => $expenses->sum('amount'),
+            'currentMonthExpenses' => $currentPeriodExpenses,
+            'lastMonthExpenses' => $previousPeriodExpenses,
+            'budgetCap' => $budgetCap,
+            'monthlyExpenses' => $this->getMonthlyData($expenses),
+            'expenseTypeData' => $this->getExpenseTypeDataForDepartment($expenses),
+            'referenceStartDate' => $referenceStartDate->format('Y-m-d'),
+            'referenceEndDate' => $referenceEndDate->format('Y-m-d'),
+        ]);
+    }
+
+    /**
+     * Método para filtrar dados do dashboard de secretário via AJAX
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function filterSecretaryDashboard(Request $request)
+    {
+        $user = Auth::user();
+
+        if (!$user->secretary) {
+            return response()->json(['error' => 'Secretaria não encontrada'], 404);
+        }
+
+        $secretaryId = $user->secretary->id;
+
+        // Consulta base - apenas despesas dos departamentos da secretaria do usuário
+        $query = Expense::whereHas('department', function ($q) use ($secretaryId) {
+            $q->where('secretary_id', $secretaryId);
+        });
+
+        // Definir período de referência - padrão: mês atual
+        $referenceStartDate = now()->startOfMonth();
+        $referenceEndDate = now()->endOfMonth();
+
+        // Filtro por data
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $referenceStartDate = Carbon::createFromFormat('Y-m-d', $request->start_date)->startOfDay();
+            $referenceEndDate = Carbon::createFromFormat('Y-m-d', $request->end_date)->endOfDay();
+
+            $query->whereBetween('expense_date', [$referenceStartDate, $referenceEndDate]);
+        }
+
+        // Filtro por departamento (apenas da secretaria do usuário)
+        if ($request->filled('department_id')) {
+            $departmentIds = Department::where('secretary_id', $secretaryId)
+                ->pluck('id')
+                ->toArray();
+
+            if (in_array($request->department_id, $departmentIds)) {
+                $query->where('department_id', $request->department_id);
+            }
+        }
+
+        // Filtro por tipo de despesa
+        if ($request->filled('expense_type')) {
+            $query->whereHas('expenseType', function ($q) use ($request) {
+                $q->where('name', $request->expense_type);
+            });
+        }
+
+        // Executa a consulta
+        $expenses = $query->with(['department', 'expenseType'])->get();
+
+        // Carrega os departamentos da secretaria
+        $departments = Department::where('secretary_id', $secretaryId)->with('expenses')->get();
+
+        // Calcula dados para períodos atual e anterior
+        $currentPeriodStart = $referenceStartDate->copy();
+        $currentPeriodEnd = $referenceEndDate->copy();
+
+        // Calcula o tamanho do período para poder comparar com "período anterior"
+        $periodLength = $currentPeriodEnd->diffInDays($currentPeriodStart) + 1;
+        $previousPeriodEnd = $currentPeriodStart->copy()->subDay();
+        $previousPeriodStart = $previousPeriodEnd->copy()->subDays($periodLength - 1);
+
+        // Soma das despesas no período atual
+        $currentPeriodExpenses = $expenses->filter(function ($expense) use ($currentPeriodStart, $currentPeriodEnd) {
+            return $expense->expense_date >= $currentPeriodStart && $expense->expense_date <= $currentPeriodEnd;
+        })->sum('amount');
+
+        // Soma das despesas no período anterior
+        $previousPeriodExpenses = Expense::whereHas('department', function ($q) use ($secretaryId) {
+            $q->where('secretary_id', $secretaryId);
+        })
+            ->whereBetween('expense_date', [$previousPeriodStart, $previousPeriodEnd])
+            ->sum('amount');
+
+        // Prepara os dados dos departamentos (para gráfico de barras)
+        $departmentsData = $departments->map(function ($department) use ($expenses) {
+            $deptExpenses = $expenses->where('department_id', $department->id);
+            return [
+                'id' => $department->id,
+                'name' => $department->name,
+                'total' => $deptExpenses->sum('amount')
+            ];
+        })
+            ->filter(function ($dept) {
+                return $dept['total'] > 0;
+            })
+            ->sortByDesc('total')
+            ->values();
+
+        // Prepara dados de tipo de despesa (para gráfico de pizza)
+        $expenseTypeData = ExpenseType::withCount(['expenses' => function ($query) use ($expenses) {
+            $query->whereIn('id', $expenses->pluck('id'));
+        }])
+            ->get()
+            ->map(function ($type) use ($expenses) {
+                $typeExpenses = $expenses->where('expense_type_id', $type->id);
+                return [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                    'value' => $typeExpenses->sum('amount'),
+                    'count' => $typeExpenses->count()
+                ];
+            })
+            ->filter(function ($type) {
+                return $type['value'] > 0;
+            })
+            ->values();
+
+        // Prepara dados para o gráfico treemap
+        $hierarchicalData = [
+            'name' => $user->secretary->name,
+            'value' => $expenses->sum('amount'),
+            'children' => $departments->map(function ($department) use ($expenses) {
+                $deptExpenses = $expenses->where('department_id', $department->id);
+                return [
+                    'name' => $department->name,
+                    'id' => $department->id,
+                    'value' => $deptExpenses->sum('amount')
+                ];
+            })
+                ->filter(function ($dept) {
+                    return $dept['value'] > 0;
+                })
+                ->values()
+        ];
+
+        // Dados mensais para o gráfico de timeline
+        $monthlyExpenses = $expenses
+            ->groupBy(function ($expense) {
+                return $expense->expense_date->format('Y-m');
+            })
+            ->map(function ($group, $month) {
+                $date = Carbon::createFromFormat('Y-m', $month);
+                return [
+                    'month' => $date->format('M/Y'),
+                    'total' => $group->sum('amount'),
+                    'sort_year' => $date->format('Y'),
+                    'sort_month' => $date->format('m')
+                ];
+            })
+            ->sortBy([
+                ['sort_year', 'asc'],
+                ['sort_month', 'asc']
+            ])
+            ->values();
+
+        // Prepara os dados para as séries do gráfico de timeline (por departamento)
+        $series = $departments
+            ->map(function ($department) use ($monthlyExpenses, $expenses) {
+                $departmentExpenses = $expenses->where('department_id', $department->id);
+
+                return [
+                    'name' => $department->name,
+                    'type' => 'line',
+                    'smooth' => true,
+                    'data' => $monthlyExpenses->map(function ($monthData) use ($departmentExpenses) {
+                        $monthDate = Carbon::createFromFormat('M/Y', $monthData['month'], 'America/Sao_Paulo');
+                        $yearMonth = $monthDate->format('Y-m');
+
+                        return $departmentExpenses
+                            ->filter(function ($expense) use ($yearMonth) {
+                                return $expense->expense_date->format('Y-m') === $yearMonth;
+                            })
+                            ->sum('amount');
+                    })->values()
+                ];
+            })
+            ->filter(function ($series) {
+                // Remove séries que não têm dados (todos zeros)
+                return collect($series['data'])->sum() > 0;
+            })
+            ->values();
+
+        // Retorna JSON com dados para o front-end
+        return response()->json([
+            'totalExpenses' => $expenses->sum('amount'),
+            'currentMonthExpenses' => $currentPeriodExpenses,
+            'lastMonthExpenses' => $previousPeriodExpenses,
+            'departmentsData' => $departmentsData,
+            'monthlyExpenses' => $monthlyExpenses,
+            'hierarchicalData' => $hierarchicalData,
+            'expenseTypeData' => $expenseTypeData,
+            'series' => $series,
+            'referenceStartDate' => $referenceStartDate->format('Y-m-d'),
+            'referenceEndDate' => $referenceEndDate->format('Y-m-d'),
+        ]);
     }
 
 }

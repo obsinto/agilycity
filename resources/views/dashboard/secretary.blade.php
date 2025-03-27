@@ -147,6 +147,23 @@
             <div id="barChart" class="h-96"></div>
         </div>
     </div>
+
+    <!-- Loading State -->
+    <div class="dashboard-loading fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+         style="display: none;">
+        <div class="bg-white p-4 rounded-lg shadow-lg flex items-center">
+            <svg class="animate-spin h-6 w-6 text-blue-600 mr-3"
+                 xmlns="http://www.w3.org/2000/svg"
+                 fill="none"
+                 viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Carregando dados...</span>
+        </div>
+    </div>
 @endsection
 
 @push('styles')
@@ -202,7 +219,7 @@
 @endpush
 
 @push('scripts')
-    @vite('resources/js/components/dashboard/index.js')
+    @vite('resources/js/components/dashboard/secretary/index.js')
 
     <script>
         /**
@@ -221,7 +238,11 @@
                 $('#dateRange').val(startDate.format('DD/MM/YYYY') + ' - ' + endDate.format('DD/MM/YYYY'));
             }
 
-            updateDashboardData(moment().startOf('month'), moment().endOf('month'));
+            if (typeof window.loadSecretaryDashboardData === 'function') {
+                window.loadSecretaryDashboardData({
+                    date_range: `${moment().startOf('month').format('DD/MM/YYYY')} - ${moment().endOf('month').format('DD/MM/YYYY')}`
+                });
+            }
         }
     </script>
 @endpush

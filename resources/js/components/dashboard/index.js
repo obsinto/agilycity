@@ -3,28 +3,100 @@ import * as echarts from 'echarts';
 import {loadDashboardData} from './dashboard';
 import {initializeDateRangePicker} from './datepicker';
 
+// Determinar o tipo de usuário/dashboard (prefeito ou secretário)
+const userRole = $('body').data('user-role') || 'unknown';
+const isSecretary = userRole === 'secretary';
+const currentSecretaryId = isSecretary ? $('body').data('secretary-id') : null;
+
+// Função para filtrar departamentos com base na secretaria selecionada
+function filterDepartments() {
+    // Se for secretário, usamos sempre o ID da secretaria do usuário
+    const secretaryId = isSecretary ? currentSecretaryId : $('#secretary').val();
+
+    // Se nenhuma secretaria estiver selecionada, mostrar todos os departamentos
+    if (!secretaryId) {
+        $('#department option').show();
+        return;
+    }
+
+    // Esconder todos os departamentos primeiro
+    $('#department option').hide();
+
+    // Mostrar apenas a opção "Todos"
+    $('#department option[value=""]').show();
+
+    // Mostrar apenas departamentos da secretaria selecionada
+    $(`#department option[data-secretary="${secretaryId}"]`).show();
+
+    // Se o departamento atualmente selecionado não pertence à secretaria,
+    // resetar a seleção para "Todos"
+    const currentDepartment = $('#department').val();
+    const belongsToSecretary = $(`#department option[value="${currentDepartment}"][data-secretary="${secretaryId}"]`).length > 0;
+
+    if (currentDepartment && !belongsToSecretary) {
+        $('#department').val('');
+    }
+}
+
+// Função para obter os filtros atuais, considerando as restrições baseadas no papel do usuário
+function getCurrentFilters() {
+    const filters = {
+        date_range: $('#dateRange').val(),
+        department_id: $('#department').val(),
+        expense_type: $('#expenseType').val()
+    };
+
+    // Se for secretário, sempre usamos o ID fixo da secretaria
+    if (isSecretary && currentSecretaryId) {
+        filters.secretary_id = currentSecretaryId;
+    } else {
+        // Se for prefeito, usamos o valor selecionado no filtro
+        filters.secretary_id = $('#secretary').val();
+    }
+
+    return filters;
+}
+
 $(document).ready(function () {
+    // Aplicar atributos ao corpo que identificam o tipo de usuário
+    if (userRole) {
+        $('body').attr('data-user-role', userRole);
+    }
+
+    // Se for secretário, ocultar o filtro de secretaria (já que é fixo)
+    if (isSecretary) {
+        $('.secretary-filter-container').hide();
+    }
+
     // Inicializa o date range picker
     initializeDateRangePicker();
 
     // Escuta pelo evento dateRangeChanged disparado pelo datepicker
     document.addEventListener('dateRangeChanged', function (event) {
+        // Combina os filtros do evento com os filtros fixos baseados no papel
+        const combinedFilters = {...event.detail.filters};
+
+        // Se for secretário, sempre sobrescreve o secretary_id
+        if (isSecretary && currentSecretaryId) {
+            combinedFilters.secretary_id = currentSecretaryId;
+        }
+
         // Quando o daterange mudar, carregamos os dados com os filtros atualizados
-        loadDashboardData(event.detail.filters);
+        loadDashboardData(combinedFilters);
 
         // Feedback visual - opcional
         $('.dashboard-filter-active').show().delay(1500).fadeOut();
     });
 
+    // Aplicar o filtro de departamentos quando a secretaria é alterada
+    $('#secretary').on('change', filterDepartments);
+
+    // Inicializar o filtro de departamentos no carregamento
+    filterDepartments();
+
     // Listeners para filtros (select boxes)
     $('#secretary, #department, #expenseType').on('change', function () {
-        const filters = {
-            date_range: $('#dateRange').val(),
-            secretary_id: $('#secretary').val(),
-            department_id: $('#department').val(),
-            expense_type: $('#expenseType').val()
-        };
-        loadDashboardData(filters);
+        loadDashboardData(getCurrentFilters());
     });
 
     // Limpar Filtros
@@ -37,21 +109,24 @@ $(document).ready(function () {
             $('#dateRange').data('daterangepicker').setEndDate(moment());
         }
 
-        $('#secretary, #department, #expenseType').val('');
-        loadDashboardData();
+        // O prefeito pode limpar todos os filtros
+        if (!isSecretary) {
+            $('#secretary').val('');
+        }
+
+        $('#department, #expenseType').val('');
+
+        // Mostrar todas as opções de departamento após limpar
+        $('#department option').show();
+
+        loadDashboardData(getCurrentFilters());
     };
 
     // Setup de clicks nos gráficos interativos
     setupChartInteractions();
 
-    // Carregamento inicial - agora incluindo o valor inicial do date range
-    const initialFilters = {
-        date_range: $('#dateRange').val(),
-        secretary_id: $('#secretary').val(),
-        department_id: $('#department').val(),
-        expense_type: $('#expenseType').val()
-    };
-    loadDashboardData(initialFilters);
+    // Carregamento inicial com os filtros iniciais
+    loadDashboardData(getCurrentFilters());
 });
 
 // Configura interações com os gráficos
@@ -61,21 +136,19 @@ function setupChartInteractions() {
     if (treemapDom) {
         echarts.getInstanceByDom(treemapDom)?.on('click', function (params) {
             if (params.data && params.data.id) {
+                // Se for secretário, não permitimos trocar de secretaria
+                if (isSecretary && params.data.children && params.data.children.length > 0) {
+                    return; // Não faz nada ao clicar em outra secretaria
+                }
+
                 // Verifica se é uma secretaria (tem children) ou um departamento
-                const filters = {};
                 if (params.data.children && params.data.children.length > 0) {
-                    filters.secretary_id = params.data.id;
-                    $('#secretary').val(params.data.id);
+                    $('#secretary').val(params.data.id).trigger('change');
                 } else {
-                    filters.department_id = params.data.id;
                     $('#department').val(params.data.id);
                 }
 
-                // Importante: incluir o filtro de data atual
-                filters.date_range = $('#dateRange').val();
-                filters.expense_type = $('#expenseType').val();
-
-                loadDashboardData(filters);
+                loadDashboardData(getCurrentFilters());
             }
         });
 
@@ -99,12 +172,7 @@ function setupChartInteractions() {
                     $('#expenseType').val(params.data.name);
                 }
 
-                loadDashboardData({
-                    date_range: $('#dateRange').val(),
-                    secretary_id: $('#secretary').val(),
-                    department_id: $('#department').val(),
-                    expense_type: $('#expenseType').val()
-                });
+                loadDashboardData(getCurrentFilters());
             }
         });
     }
@@ -112,11 +180,13 @@ function setupChartInteractions() {
 
 // Função para mostrar detalhes de departamento (chamada diretamente do HTML)
 window.showDepartmentDetails = function (secretaryId) {
-    $('#secretary').val(secretaryId);
-    loadDashboardData({
-        date_range: $('#dateRange').val(),
-        secretary_id: secretaryId,
-        department_id: $('#department').val(),
-        expense_type: $('#expenseType').val()
-    });
+    // Se for secretário, ignora o parâmetro e usa o ID da secretaria atual
+    const idToUse = isSecretary ? currentSecretaryId : secretaryId;
+
+    if (!isSecretary) {
+        $('#secretary').val(idToUse).trigger('change');
+    }
+
+    const filters = getCurrentFilters();
+    loadDashboardData(filters);
 };

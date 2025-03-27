@@ -46,7 +46,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         // Padrão para outros usuários
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route('sector.dashboard'));
     }
 
     /**

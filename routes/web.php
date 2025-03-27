@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentEnrollmentController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ExpenseTypeController;
+use App\Http\Controllers\MonthlyMealController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\SecretaryManagementController;
@@ -13,9 +14,39 @@ use App\Http\Controllers\SpendingCapController;
 use App\Http\Controllers\StudentAnalysisController;
 use Illuminate\Support\Facades\Route;
 
+// routes/web.php - adicionar rotas para o dashboard de setor
+
+// Rota principal do dashboard
+Route::get('/sector-dashboard', [DashboardController::class, 'sectorLeaderDashboard'])
+    ->name('sector.dashboard')
+    ->middleware(['auth', 'role:sector_leader|school_leader|cantina_leader']);
+
+// Rota para filtros via AJAX
+Route::get('/dashboard/sector/filter', [DashboardController::class, 'filterSectorDashboard'])
+    ->name('sector.dashboard.filter')
+    ->middleware(['auth', 'role:sector_leader|school_leader|cantina_leader']);
+
 Route::get('/', function () {
     return view('auth.login');
 });
+
+//dashboard secretario
+// routes/web.php - adicionar rotas para o dashboard de secretário
+
+// Rota principal do dashboard
+Route::get('/dashboard/secretary', [DashboardController::class, 'secretaryDashboard'])
+    ->name('secretary.dashboard')
+    ->middleware(['auth', 'role:education_secretary|secretary']);
+
+// Rota para filtros via AJAX
+Route::get('/dashboard/secretary/filter', [DashboardController::class, 'filterSecretaryDashboard'])
+    ->name('secretary.dashboard.filter')
+    ->middleware(['auth', 'role:education_secretary|secretary']);
+
+// Rota para detalhes de departamento
+Route::get('/dashboard/secretary/department/{id}', [DashboardController::class, 'getDepartmentDetails'])
+    ->name('secretary.department.details')
+    ->middleware(['auth', 'role:education_secretary|secretary']);
 
 // Dashboard principal - redireciona para o dashboard apropriado com base no papel do usuário
 Route::get('/dashboard', [DashboardController::class, 'index'])
@@ -31,10 +62,6 @@ Route::get('/secretary-dashboard', [DashboardController::class, 'secretaryDashbo
     ->middleware(['permission:view dashboard', 'role:education_secretary|secretary'])
     ->name('secretary.dashboard');
 
-
-Route::get('/sector-dashboard', [DashboardController::class, 'sectorLeaderDashboard'])
-    ->middleware(['permission:view dashboard', 'role:sector_leader'])
-    ->name('sector.dashboard');
 
 Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
 Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -88,9 +115,10 @@ Route::middleware(['permission:manage departments'])->group(function () {
 });
 
 Route::resource('expense-types', ExpenseTypeController::class)
-    ->middleware('permission:manage departments');
+    ->middleware('permission:manage expense types');
+
 Route::resource('expenses', ExpenseController::class)
-    ->middleware('permission:manage departments');
+    ->middleware('permission:manage expenses');
 
 Route::get('/dashboard/filter', [DashboardController::class, 'filter'])
     ->middleware('permission:view dashboard')
@@ -107,8 +135,13 @@ Route::get('/cantina/report', [\App\Http\Controllers\CantinaReportController::cl
     ->middleware('permission:view cantina report')
     ->name('cantina.report');
 
+Route::middleware(['permission:manage monthly meals'])->group(function () {
+    Route::get('/monthly-meals', [MonthlyMealController::class, 'index'])->name('monthly-meals.index');
+    Route::post('/monthly-meals', [MonthlyMealController::class, 'store'])->name('monthly-meals.store');
+});
+
 Route::get('/reports/students', [StudentAnalysisController::class, 'index'])
-    ->middleware('permission:view all schools')
+    ->middleware(['permission:view all schools|view student report'])
     ->name('reports.students');
 
 Route::middleware(['permission:manage students'])->group(function () {
