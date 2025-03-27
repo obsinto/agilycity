@@ -6,6 +6,7 @@ use App\Http\Controllers\DepartmentEnrollmentController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ExpenseTypeController;
 use App\Http\Controllers\MonthlyMealController;
+use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\SecretaryManagementController;
@@ -170,6 +171,24 @@ Route::middleware(['permission:manage students'])->group(function () {
         ->name('enrollments.update');
     Route::delete('/enrollments/{enrollment}', [DepartmentEnrollmentController::class, 'destroy'])
         ->name('enrollments.destroy');
+});
+
+Route::middleware(['auth'])->group(function () {
+    // Rotas de administração de permissões
+    Route::prefix('admin')->group(function () {
+        Route::get('/permissions', [PermissionController::class, 'index'])->name('permissions.index');
+        Route::post('/permissions', [PermissionController::class, 'store'])->name('permissions.store');
+        Route::put('/roles/{role}/permissions', [PermissionController::class, 'updateRolePermissions'])
+            ->name('permissions.update-role');
+        Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])
+            ->name('permissions.destroy');
+
+        // Atribuir roles a usuários
+        Route::get('/users/{user}/edit-roles', [PermissionController::class, 'editUserRoles'])
+            ->name('permissions.edit-user-roles');
+        Route::put('/users/{user}/roles', [PermissionController::class, 'assignRolesToUser'])
+            ->name('permissions.assign-roles');
+    });
 });
 
 
