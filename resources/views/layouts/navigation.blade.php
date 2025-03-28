@@ -114,8 +114,9 @@
             @endcan
 
             <!-- Cadastro de Merenda Mensal - Visível apenas para líderes da cantina central -->
+            <!-- Cadastro de Merenda Mensal - Visível apenas para líderes da cantina central -->
             @can('manage monthly meals')
-                @if(auth()->user()->hasRole('cantina_central'))
+                @if(auth()->user()->hasRole('cantina_leader'))
                     <li class="relative"
                         x-data="{ tooltip: false }"
                         @mouseenter="tooltip = sidebarOpen ? false : true"
@@ -201,6 +202,37 @@
                     <div x-show="tooltip"
                          class="absolute left-full top-0 ml-2 bg-black text-white text-sm px-2 py-1 rounded z-10">
                         Despesas
+                    </div>
+                </li>
+            @endif
+
+            <!-- Despesas Fixas -->
+            @if(auth()->user()->hasAnyRole(['secretary', 'education_secretary', 'sector_leader', 'cantina_leader']) ||
+                (auth()->user()->department && auth()->user()->department->is_school) ||
+                (auth()->user()->department && auth()->user()->department->name == 'Cantina Central'))
+                <li class="relative"
+                    x-data="{ tooltip: false }"
+                    @mouseenter="tooltip = sidebarOpen ? false : true"
+                    @mouseleave="tooltip = false">
+                    <a href="{{ route('fixed-expenses.index') }}"
+                       class="block py-2 hover:bg-gray-100 {{ request()->routeIs('fixed-expenses.*') ? 'bg-gray-100' : '' }} flex items-center"
+                       :class="{'px-4': sidebarOpen, 'justify-center px-0': !sidebarOpen}">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             class="h-5 w-5"
+                             :class="{'mr-3': sidebarOpen}"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor">
+                            <path stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                        <span x-show="sidebarOpen">Despesas Fixas</span>
+                    </a>
+                    <div x-show="tooltip"
+                         class="absolute left-full top-0 ml-2 bg-black text-white text-sm px-2 py-1 rounded z-10">
+                        Despesas Fixas
                     </div>
                 </li>
             @endif

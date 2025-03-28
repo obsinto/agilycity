@@ -22,6 +22,20 @@ class MonthlyMealController extends Controller
             abort(403, 'Acesso não autorizado');
         }
 
+        $user = auth()->user();
+
+        // Verificar papéis do usuário para decidir se pode visualizar todas as escolas
+        $isAdmin = $user->hasRole('admin');
+        $isPrefeito = $user->hasRole('mayor');
+        $isSecretario = $user->hasRole('secretary') || $user->hasRole('education_secretary');
+        $isCantina = $user->hasRole('cantina_leader') || ($user->department && $user->department->name === 'Cantina Central');
+
+        // Define se o usuário pode ver todas as escolas
+        $showAllSchools = $isAdmin || $isPrefeito || $isSecretario || $isCantina;
+
+        // Define se o usuário pode adicionar despesas (somente usuários da cantina)
+        $canAddExpenses = $isCantina || $isAdmin || $isPrefeito || $user->hasRole('education_secretary');
+
         $year = $request->input('year', now()->year);
         $month = $request->input('month', now()->month);
 
@@ -95,9 +109,14 @@ class MonthlyMealController extends Controller
         }
 
         // Escolas e seus alunos para o rateio
-        $schools = Department::where('is_school', true)
-            ->orderBy('name')
-            ->get();
+        $schools = Department::where('is_school', true);
+
+        // Se não pode ver todas as escolas, filtra apenas para a escola do usuário
+        if (!$showAllSchools && $user->department && $user->department->is_school) {
+            $schools->where('id', $user->department_id);
+        }
+
+        $schools = $schools->orderBy('name')->get();
 
         $schoolsData = [];
         foreach ($schools as $school) {
@@ -122,9 +141,26 @@ class MonthlyMealController extends Controller
             ->orderByDesc('expense_date')
             ->get();
 
+        // Criar array de meses para a view
+        $months = [
+            1 => 'Janeiro',
+            2 => 'Fevereiro',
+            3 => 'Março',
+            4 => 'Abril',
+            5 => 'Maio',
+            6 => 'Junho',
+            7 => 'Julho',
+            8 => 'Agosto',
+            9 => 'Setembro',
+            10 => 'Outubro',
+            11 => 'Novembro',
+            12 => 'Dezembro'
+        ];
+
         return view('meals.monthly', [
             'year' => $year,
             'month' => $month,
+            'months' => $months,
             'monthlyMeal' => $monthlyMeal,
             'availableMonths' => $availableMonths,
             'totalAlunos' => $totalAlunos,
@@ -132,7 +168,9 @@ class MonthlyMealController extends Controller
             'schoolsData' => $schoolsData,
             'recentExpenses' => $recentExpenses,
             'totalMerendaMes' => $totalMerendaMes,
-            'merendaType' => $merendaType
+            'merendaType' => $merendaType,
+            'showAllSchools' => $showAllSchools,
+            'canAddExpenses' => $canAddExpenses
         ]);
     }
 

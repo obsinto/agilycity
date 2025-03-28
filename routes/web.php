@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentEnrollmentController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ExpenseTypeController;
+use App\Http\Controllers\FixedExpenseController;
 use App\Http\Controllers\MonthlyMealController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProfileController;
@@ -120,6 +121,16 @@ Route::resource('expense-types', ExpenseTypeController::class)
 
 Route::resource('expenses', ExpenseController::class)
     ->middleware('permission:manage expenses');
+
+// Rotas para despesas fixas
+Route::get('fixed-expenses', [FixedExpenseController::class, 'index'])->name('fixed-expenses.index');
+Route::post('fixed-expenses', [FixedExpenseController::class, 'store'])->name('fixed-expenses.store');
+Route::get('fixed-expenses/{fixedExpense}/edit', [FixedExpenseController::class, 'edit'])->name('fixed-expenses.edit');
+Route::put('fixed-expenses/{fixedExpense}', [FixedExpenseController::class, 'update'])->name('fixed-expenses.update');
+
+// Rota para geração manual de despesas fixas
+Route::get('fixed-expenses/generate', [FixedExpenseController::class, 'generateMonthlyExpenses'])->name('fixed-expenses.generate');
+
 
 Route::get('/dashboard/filter', [DashboardController::class, 'filter'])
     ->middleware('permission:view dashboard')

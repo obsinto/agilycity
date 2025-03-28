@@ -65,18 +65,22 @@
                     @foreach($monthsLabels as $label)
                         <th class="px-3 py-2 border-r text-center">{{ $label }}</th>
                     @endforeach
-                    <th class="px-3 py-2 text-center">Total</th>
+                    <th class="px-3 py-2 text-center">Média Mensal</th>
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($tableData as $row)
-                    <tr>
+                @foreach($tableData as $index => $row)
+                    <tr class="{{ $row['department'] === 'TOTAL' ? 'bg-gray-100 font-bold' : '' }}">
                         <td class="border px-3 py-2">{{ $row['department'] }}</td>
                         @foreach($row['counts'] as $month => $count)
                             <td class="border px-3 py-2 text-center">{{ $count }}</td>
                         @endforeach
                         <td class="border px-3 py-2 text-center font-semibold">
-                            {{ $row['yearly_sum'] }}
+                            @if($row['department'] === 'TOTAL')
+                                {{ number_format($row['yearly_sum'] / 12, 0) }}
+                            @else
+                                {{ number_format($row['yearly_sum'] / 12, 0) }}
+                            @endif
                         </td>
                     </tr>
                 @endforeach

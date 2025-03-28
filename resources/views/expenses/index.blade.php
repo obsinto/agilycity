@@ -5,10 +5,16 @@
         <div class="bg-white shadow-md rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold">Despesas</h2>
-                <button type="button" onclick="openModal()"
-                        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                    Nova Despesa
-                </button>
+                <div class="flex space-x-2">
+                    <a href="{{ route('fixed-expenses.index') }}"
+                       class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                        Despesas Fixas
+                    </a>
+                    <button type="button" onclick="openModal()"
+                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Nova Despesa
+                    </button>
+                </div>
             </div>
 
             @if(session('success'))
@@ -117,13 +123,6 @@
                            required>
                 </div>
 
-{{--                <div class="mb-4">--}}
-                {{--                    <label class="block text-sm font-medium text-gray-700">Nº Nota Fiscal</label>--}}
-                {{--                    <input type="text"--}}
-                {{--                           name="invoice_number"--}}
-                {{--                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">--}}
-                {{--                </div>--}}
-
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700">Observação</label>
                     <textarea name="observation"
@@ -136,6 +135,18 @@
                     <input type="file"
                            name="attachment"
                            class="mt-1 block w-full">
+                </div>
+
+                <div class="mb-4 flex items-center">
+                    <input type="checkbox"
+                           name="is_fixed"
+                           id="is_fixed"
+                           value="1"
+                           class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                           onchange="handleFixedExpense()">
+                    <label for="is_fixed" class="ml-2 block text-sm font-medium text-gray-700">
+                        Esta é uma despesa fixa/recorrente
+                    </label>
                 </div>
 
                 <div class="flex justify-end gap-2">
@@ -166,6 +177,28 @@
             const modal = document.getElementById('newExpenseModal');
             if (modal) {
                 modal.classList.add('hidden');
+            }
+        }
+
+        function handleFixedExpense() {
+            const isFixed = document.getElementById('is_fixed').checked;
+            if (isFixed) {
+                // Adiciona uma mensagem informativa
+                const infoText = document.createElement('p');
+                infoText.id = 'fixed-expense-info';
+                infoText.classList.add('text-sm', 'text-blue-600', 'mt-2');
+                infoText.textContent = 'Ao salvar, você será redirecionado para o cadastro de despesas fixas.';
+
+                // Verifica se o elemento já existe
+                if (!document.getElementById('fixed-expense-info')) {
+                    document.getElementById('is_fixed').parentElement.appendChild(infoText);
+                }
+            } else {
+                // Remove a mensagem informativa
+                const infoText = document.getElementById('fixed-expense-info');
+                if (infoText) {
+                    infoText.remove();
+                }
             }
         }
 
@@ -200,5 +233,10 @@
             document.getElementById('amount_value').value = value;
             this.submit();
         });
+
+        function viewExpense(id) {
+            // Implementar visualização detalhada da despesa
+            alert('Visualizar detalhes da despesa ' + id);
+        }
     </script>
 @endsection

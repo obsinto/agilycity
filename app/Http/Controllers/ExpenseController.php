@@ -39,9 +39,9 @@ class ExpenseController extends Controller
             'expense_type_id' => 'required|exists:expense_types,id',
             'amount' => 'required|numeric',
             'expense_date' => 'required|date',
-//            'invoice_number' => 'nullable|string',
             'observation' => 'nullable|string',
-            'attachment' => 'nullable|file|max:2048'
+            'attachment' => 'nullable|file|max:2048',
+            'is_fixed' => 'nullable|boolean' // Novo campo para indicar se é uma despesa fixa
         ]);
 
         try {
@@ -55,6 +55,13 @@ class ExpenseController extends Controller
             } else {
                 // Se for secretário, usa a secretaria dele
                 $data['secretary_id'] = $user->secretary_id;
+            }
+
+            // Verifica se é uma despesa fixa
+            if ($request->has('is_fixed') && $request->is_fixed) {
+                // Redireciona para o formulário de despesa fixa com os dados preenchidos
+                return redirect()->route('fixed-expenses.create')
+                    ->with('data', $data);
             }
 
             // Para debug

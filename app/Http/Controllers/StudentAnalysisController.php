@@ -48,6 +48,8 @@ class StudentAnalysisController extends Controller
 
         $chartData = [];
         $tableData = [];
+        $totals = collect(range(1, 12))->mapWithKeys(fn($m) => [$m => 0]);
+        $yearlyTotal = 0;
 
         foreach ($departments as $dept) {
             $enrollments = DepartmentEnrollment::where('department_id', $dept->id)
@@ -68,9 +70,22 @@ class StudentAnalysisController extends Controller
                 'counts' => $monthlyCounts,
                 'yearly_sum' => $monthlyCounts->sum(),
             ];
+
+            // Atualiza os totais mensais
+            foreach ($monthlyCounts as $month => $count) {
+                $totals[$month] += $count;
+            }
+        }
+
+        // Adiciona os totais mensais como a última linha da tabela, se tiver mais de uma escola
+        if (count($departments) > 1) {
+            $tableData[] = [
+                'department' => 'TOTAL',
+                'counts' => $totals,
+                'yearly_sum' => $totals->sum(),
+            ];
         }
 
         return view('reports.students', compact('year', 'departmentId', 'allSchools', 'monthsLabels', 'chartData', 'tableData'));
     }
-
 }
