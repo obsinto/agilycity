@@ -1,66 +1,199 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# AgilyCity - Sistema de Gestão Municipal
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+![AgilyCity Logo](https://via.placeholder.com/200x50?text=AgilyCity)
 
-## About Laravel
+AgilyCity é um sistema completo de gestão municipal desenvolvido para otimizar processos administrativos e proporcionar
+maior transparência na gestão pública. O sistema oferece ferramentas para gerenciamento de secretarias, departamentos,
+despesas, orçamentos e recursos educacionais.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 🌟 Principais Funcionalidades
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Dashboard Personalizado
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Dashboard do Prefeito**: Visão geral de todas as secretarias e indicadores municipais
+- **Dashboard de Secretaria**: Gestão específica para cada secretaria municipal
+- **Dashboard de Setor**: Visão operacional para líderes de departamentos e escolas
 
-## Learning Laravel
+### Gestão de Despesas
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Despesas Regulares**: Registro e acompanhamento de despesas pontuais
+- **Despesas Fixas**: Automação de despesas recorrentes (salários, aluguéis, etc.)
+- **Controle de Tipos de Despesa**: Categorização personalizada de gastos
+- **Teto de Gastos**: Definição e monitoramento de limites orçamentários
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+### Gestão Educacional
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Cadastro de Alunos**: Gerenciamento de matrículas nas escolas municipais
+- **Análise Escolar**: Relatórios e estatísticas de matrículas por período
+- **Controle de Merenda**: Sistema especializado para gestão da cantina central
+- **Relatório de Cantina**: Distribuição proporcional de custos entre escolas
 
-## Laravel Sponsors
+### Estrutura Administrativa
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- **Gerenciamento de Secretarias**: Configuração e monitoramento de órgãos municipais
+- **Gerenciamento de Departamentos**: Organização interna de cada secretaria
+- **Associação de Líderes**: Atribuição de responsáveis para cada unidade
+- **Sistema de Permissões**: Controle granular de acesso baseado em papéis
 
-### Premium Partners
+## 🚀 Tecnologias Utilizadas
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+- **Backend**: Laravel 11
+- **Frontend**: Blade Templates, Alpine.js, Tailwind CSS
+- **Banco de Dados**: MySQL
+- **Containerização**: Docker
 
-## Contributing
+## 🔧 Pré-requisitos
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- PHP 8.2+
+- Composer 2.0+
+- Node.js 18.0+ e NPM
+- Docker e Docker Compose (recomendado)
+- MySQL 8.0+
 
-## Code of Conduct
+## 📋 Instalação
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Usando Docker (Recomendado)
 
-## Security Vulnerabilities
+1. Clone o repositório:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+git clone https://github.com/seu-usuario/agilycity.git
+cd agilycity
+```
 
-## License
+2. Configure o arquivo .env:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+cp .env.example .env
+# Edite o arquivo .env com suas configurações
+```
+
+3. Inicie os containers:
+
+```bash
+docker-compose up -d
+```
+
+4. Execute as migrações e seeders:
+
+```bash
+docker-compose exec app php artisan migrate --seed
+```
+
+### Instalação Manual
+
+1. Clone o repositório:
+
+```bash
+git clone https://github.com/seu-usuario/agilycity.git
+cd agilycity
+```
+
+2. Instale as dependências:
+
+```bash
+composer install
+npm install
+```
+
+3. Configure o arquivo .env:
+
+```bash
+cp .env.example .env
+# Edite o arquivo .env com suas configurações
+php artisan key:generate
+```
+
+4. Execute as migrações e seeders:
+
+```bash
+php artisan migrate --seed
+```
+
+5. Compile os assets:
+
+```bash
+npm run build
+```
+
+6. Inicie o servidor:
+
+```bash
+php artisan serve
+```
+
+## 🔄 Funcionalidades Especiais
+
+### Sistema de Despesas Fixas
+
+O AgilyCity implementa um sistema sofisticado de despesas fixas com as seguintes características:
+
+1. **Cadastro de Despesas Recorrentes**: Configure uma vez e o sistema gera lançamentos mensais automaticamente
+2. **Histórico de Alterações**: Mantém registro de mudanças nos valores ao longo do tempo
+3. **Automação por Agendamento**: Utiliza o Laravel Scheduler para gerar automaticamente os lançamentos no início de
+   cada mês
+4. **Datas de Vigência**: Possibilidade de definir períodos específicos para validade da despesa fixa
+
+Para ativar o agendador, adicione a seguinte entrada ao seu crontab:
+
+```bash
+* * * * * cd /caminho-para-seu-projeto && php artisan schedule:run >> /dev/null 2>&1
+```
+
+### Sistema de Cantina Central
+
+O módulo de gestão da cantina central permite:
+
+1. **Registro de Despesas de Merenda**: Controle específico para gastos com alimentação escolar
+2. **Distribuição Proporcional**: Cálculo automatizado de custos por aluno em cada escola
+3. **Relatórios Mensais**: Visualização detalhada da distribuição de recursos entre escolas
+
+## 👥 Estrutura de Usuários e Permissões
+
+O sistema utiliza os seguintes perfis de usuário:
+
+- **Prefeito (mayor)**: Acesso total ao sistema
+- **Secretário (secretary)**: Acesso completo à sua secretaria
+- **Secretário de Educação (education_secretary)**: Permissões especiais para gestão educacional
+- **Líder de Setor (sector_leader)**: Gerencia um departamento específico
+- **Líder de Escola (school_leader)**: Gerencia uma unidade escolar
+- **Líder de Cantina (cantina_leader)**: Responsável pela cantina central
+
+## 🛠️ Ambiente de Desenvolvimento
+
+O projeto está configurado com:
+
+- **Laravel Sail**: Ambiente Docker para desenvolvimento
+- **Vite**: Compilação rápida de assets
+- **Laravel Debugbar**: Ferramentas de depuração
+- **Laravel Permission (Spatie)**: Sistema de controle de acesso baseado em papéis
+
+## 📱 Responsividade
+
+O sistema é totalmente responsivo, adaptando-se a diferentes tamanhos de tela:
+
+- **Desktop**: Experiência completa com sidebar expansível
+- **Tablet**: Interface adaptativa com menu colapsável
+- **Mobile**: Menu mobile otimizado para telas pequenas
+
+## 🧪 Testes
+
+Execute os testes automatizados com:
+
+```bash
+php artisan test
+```
+
+## 📚 Documentação Adicional
+
+- [Manual do Usuário](docs/user-manual.md)
+- [Documentação da API](docs/api.md)
+- [Guia de Contribuição](CONTRIBUTING.md)
+
+## 📄 Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
+## 👨‍💻 Contato
+
+Para suporte ou mais informações, entre em contato pelo email: contato@agilycity.com
