@@ -477,6 +477,35 @@
                     </div>
                 </li>
             @endif
+
+            <!-- Status de Fechamento Mensal - Visível para prefeito e secretários -->
+            @if(auth()->user()->hasRole('mayor') || auth()->user()->hasRole('secretary') || auth()->user()->hasRole('education_secretary'))
+                <li class="relative"
+                    x-data="{ tooltip: false }"
+                    @mouseenter="tooltip = sidebarOpen ? false : true"
+                    @mouseleave="tooltip = false">
+                    <a href="{{ route('compliance.dashboard') }}"
+                       class="block py-2 hover:bg-gray-100 {{ request()->routeIs('compliance.*') ? 'bg-gray-100' : '' }} flex items-center"
+                       :class="{'px-4': sidebarOpen, 'justify-center px-0': !sidebarOpen}">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             class="h-5 w-5"
+                             :class="{'mr-3': sidebarOpen}"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor">
+                            <path stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        <span x-show="sidebarOpen">Status de Fechamento</span>
+                    </a>
+                    <div x-show="tooltip"
+                         class="absolute left-full top-0 ml-2 bg-black text-white text-sm px-2 py-1 rounded z-10">
+                        Status de Fechamento
+                    </div>
+                </li>
+            @endif
         </ul>
     </nav>
 

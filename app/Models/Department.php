@@ -35,4 +35,22 @@ class Department extends Model
         return $query->where('is_school', true);
     }
 
+    public function monthlySubmissions()
+    {
+        return $this->hasMany(MonthlyExpenseSubmission::class);
+    }
+
+    public function getMonthlySubmission($year, $month)
+    {
+        return $this->monthlySubmissions()
+            ->where('year', $year)
+            ->where('month', $month)
+            ->first();
+    }
+
+    public function isMonthClosed($year, $month)
+    {
+        $submission = $this->getMonthlySubmission($year, $month);
+        return $submission && $submission->is_submitted;
+    }
 }

@@ -105,12 +105,104 @@
                                 : 0;
                         @endphp
                         <div class="w-full bg-gray-200 rounded-full h-2.5">
-                            <div class="bg-{{ $usagePercent > 80 ? 'red' : ($usagePercent > 60 ? 'yellow' : 'green') }}-500 h-2.5 rounded-full"
-                                 style="width: {{ $usagePercent }}%"></div>
+                            <div
+                                class="bg-{{ $usagePercent > 80 ? 'red' : ($usagePercent > 60 ? 'yellow' : 'green') }}-500 h-2.5 rounded-full"
+                                style="width: {{ $usagePercent }}%"></div>
                         </div>
                         <span class="ml-2 text-gray-600 text-sm">{{ $usagePercent }}%</span>
                     </div>
                 </div>
+            </div>
+        </div>
+        <!-- Status de Fechamento do Mês -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">Status de Fechamento - {{ $monthName }}/{{ $year }}</h2>
+
+            <div class="flex flex-wrap md:flex-nowrap">
+                <div class="w-full md:w-1/2 md:pr-6">
+                    <div class="flex items-center mb-4">
+                        @if($deptComplianceData['is_closed'])
+                            <div class="bg-green-100 text-green-800 px-4 py-2 rounded-md flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                     viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>Mês Fechado</span>
+                            </div>
+                        @elseif($deptComplianceData['status'] == 'ready_to_close')
+                            <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-md flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                     viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>Pronto para Fechar</span>
+                            </div>
+                        @else
+                            <div class="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-md flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                     viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>Pendente</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    @if($deptComplianceData['is_closed'])
+                        <div class="text-sm text-gray-600 mt-2">
+                            <p>Fechado por: {{ $deptComplianceData['submitted_by'] }}</p>
+                            <p>Data: {{ $deptComplianceData['submitted_at']->format('d/m/Y H:i') }}</p>
+                        </div>
+                    @endif
+
+                    @if(!$deptComplianceData['is_closed'] && $deptComplianceData['can_close'])
+                        <form action="{{ route('compliance.close-month') }}" method="POST" class="mt-4">
+                            @csrf
+                            <input type="hidden" name="department_id" value="{{ $deptComplianceData['id'] }}">
+                            <input type="hidden" name="year" value="{{ $year }}">
+                            <input type="hidden" name="month" value="{{ $month }}">
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                Fechar Mês
+                            </button>
+                        </form>
+                    @endif
+                </div>
+
+                @if(!$deptComplianceData['is_closed'])
+                    <div class="w-full md:w-1/2 mt-4 md:mt-0 md:pl-6 md:border-l border-gray-200">
+                        <h3 class="font-medium mb-2">Pendências para Fechamento</h3>
+
+                        @if($deptComplianceData['missing_categories_count'] > 0)
+                            <div class="mb-3">
+                                <h4 class="text-sm font-medium text-red-600">Categorias de despesa pendentes:</h4>
+                                <ul class="list-disc ml-5 text-sm text-gray-600">
+                                    @foreach($deptComplianceData['missing_categories'] as $category)
+                                        <li>{{ $category }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+
+                        @if($deptComplianceData['missing_fixed_expenses_count'] > 0)
+                            <div class="mb-3">
+                                <h4 class="text-sm font-medium text-red-600">Despesas fixas pendentes:</h4>
+                                <ul class="list-disc ml-5 text-sm text-gray-600">
+                                    @foreach($deptComplianceData['missing_fixed_expenses'] as $expense)
+                                        <li>{{ $expense['name'] }} -
+                                            R$ {{ number_format($expense['amount'], 2, ',', '.') }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+
+                        @if($deptComplianceData['missing_categories_count'] == 0 && $deptComplianceData['missing_fixed_expenses_count'] == 0)
+                            <p class="text-sm text-green-600">Sem pendências para este mês.</p>
+                        @endif
+                    </div>
+                @endif
             </div>
         </div>
 

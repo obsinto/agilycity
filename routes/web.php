@@ -128,6 +128,10 @@ Route::post('fixed-expenses', [FixedExpenseController::class, 'store'])->name('f
 Route::get('fixed-expenses/{fixedExpense}/edit', [FixedExpenseController::class, 'edit'])->name('fixed-expenses.edit');
 Route::put('fixed-expenses/{fixedExpense}', [FixedExpenseController::class, 'update'])->name('fixed-expenses.update');
 
+
+// Rotas para o sistema de vistoria de despesas (Compliance)
+// Rotas para o sistema de vistoria de despesas (Compliance)
+
 // Rota para geração manual de despesas fixas
 Route::get('fixed-expenses/generate', [FixedExpenseController::class, 'generateMonthlyExpenses'])->name('fixed-expenses.generate');
 
@@ -200,6 +204,13 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/users/{user}/roles', [PermissionController::class, 'assignRolesToUser'])
             ->name('permissions.assign-roles');
     });
+
+
+    Route::get('/compliance', [App\Http\Controllers\ComplianceController::class, 'dashboard'])->name('compliance.dashboard');
+    Route::get('/compliance/secretary/{secretary}', [App\Http\Controllers\ComplianceController::class, 'secretaryDetails'])->name('compliance.secretary-details');
+    Route::post('/compliance/close-month', [App\Http\Controllers\ComplianceController::class, 'closeMonth'])->name('compliance.close-month');
+    Route::post('/compliance/override-status', [App\Http\Controllers\ComplianceController::class, 'overrideStatus'])->name('compliance.override-status');
+
 });
 
 

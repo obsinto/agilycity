@@ -130,6 +130,35 @@
                 </div>
             </div>
         </div>
+        // Vistoria
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            @foreach($complianceData['secretaries'] as $secretary)
+                <div
+                    class="bg-gray-50 p-4 rounded-lg border {{ $secretary['status'] == 'complete' ? 'border-green-500' : 'border-yellow-500' }}">
+                    <h3 class="font-medium">{{ $secretary['name'] }}</h3>
+                    <div class="mt-2">
+                        <div class="flex items-center text-sm">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full"
+                                     style="width: {{ $secretary['completion_percentage'] }}%"></div>
+                            </div>
+                            <span class="ml-2">{{ number_format($secretary['completion_percentage']) }}%</span>
+                        </div>
+                        <div class="mt-1 text-xs text-gray-600">
+                            {{ $secretary['closed_departments'] }}/{{ $secretary['total_departments'] }} departamentos
+                        </div>
+                    </div>
+                    <a href="{{ route('compliance.secretary-details', ['secretary' => $secretary['id']]) }}"
+                       class="mt-2 text-sm text-blue-600 hover:underline block">Ver detalhes</a>
+                </div>
+            @endforeach
+        </div>
+
+        <div class="mt-4 text-right">
+            <a href="{{ route('compliance.dashboard') }}" class="text-blue-600 hover:underline">Ver dashboard completo
+                →</a>
+        </div>
+
 
         <!-- Treemap -->
         <div class="bg-white rounded-lg shadow p-6 mb-6">

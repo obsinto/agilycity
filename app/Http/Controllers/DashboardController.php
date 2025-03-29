@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\Expense;
 use App\Models\ExpenseType;
+use App\Models\FixedExpense;
+use App\Models\MonthlyExpenseSubmission;
 use App\Models\Secretary;
 use App\Services\ExpenseCapService;
 use Carbon\Carbon;
@@ -46,6 +48,7 @@ class DashboardController extends Controller
             return redirect()->route('login');
         }
 
+        $complianceData = $this->getComplianceData();
         $user = Auth::user();
 
         if ($user->hasRole('mayor')) {
@@ -146,31 +149,23 @@ class DashboardController extends Controller
                 'series',
                 'expenseTypes',
                 'expenseTypeData',
-                'capValue',     // Passa o teto de gastos para a view
-                'capSource'     // Passa a origem do teto para a view
+                'capValue',
+                'capSource',
+                'complianceData'
             ));
         }
 
         if ($user->hasRole('secretary')) {
-            return view('dashboard.secretary', ['secretary' => $user->secretary]);
+            return redirect()->route('secretary.dashboard');
         }
 
         if ($user->hasRole('sector_leader')) {
-            return view('dashboard.sector_leader', ['department' => $user->department]);
+            return redirect()->route('sector.dashboard');
         }
 
         return view('dashboard.default');
     }
 
-    /**
-     * Método que filtra os dados (provavelmente chamado por AJAX).
-     */
-    /**
-     * Método que filtra os dados de acordo com o papel do usuário e os filtros aplicados.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     /**
      * Método que filtra os dados de acordo com o papel do usuário e os filtros aplicados.
      *
@@ -657,6 +652,63 @@ class DashboardController extends Controller
 
         $secretary = $user->secretary;
 
+        // Carrega os dados de compliance
+        $currentDate = Carbon::now();
+        $year = request()->input('year', $currentDate->year);
+        $month = request()->input('month', $currentDate->month);
+
+        // Buscar departamentos com seu status de compliance
+        $departments = Department::where('secretary_id', $secretary->id)
+            ->with(['monthlySubmissions' => function ($q) use ($year, $month) {
+                $q->where('year', $year)->where('month', $month);
+            }])
+            ->get();
+
+        // Preparar os dados de compliance para cada departamento
+        $departmentsData = [];
+        $closedDepts = 0;
+        $totalDepts = count($departments);
+
+        foreach ($departments as $department) {
+            // Verificar se pode fechar o mês
+            $closeCheck = app(ComplianceController::class)->canCloseMonth($department->id, $year, $month);
+
+            // Verificar se o mês já está fechado
+            $submission = $department->monthlySubmissions->first();
+            $isClosed = $submission && $submission->is_submitted;
+
+            if ($isClosed) {
+                $closedDepts++;
+            }
+
+            // Adicionar informações do departamento
+            $departmentsData[] = [
+                'id' => $department->id,
+                'name' => $department->name,
+                'is_closed' => $isClosed,
+                'submitted_at' => $submission ? $submission->submitted_at : null,
+                'submitted_by' => $submission ? ($submission->submitter->name ?? 'Sistema') : null,
+                'status' => $isClosed ? 'closed' : ($closeCheck['can_close'] ? 'ready_to_close' : 'incomplete'),
+                'missing_categories_count' => isset($closeCheck['missing_categories']) ? count($closeCheck['missing_categories']) : 0,
+                'missing_categories' => isset($closeCheck['missing_categories']) ?
+                    ExpenseType::whereIn('id', $closeCheck['missing_categories'])->pluck('name') :
+                    [],
+                'missing_fixed_expenses_count' => isset($closeCheck['missing_fixed_expenses']) ? count($closeCheck['missing_fixed_expenses']) : 0,
+                'missing_fixed_expenses' => isset($closeCheck['missing_fixed_expenses']) ?
+                    FixedExpense::whereIn('id', $closeCheck['missing_fixed_expenses'])->get()->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'name' => $item->name,
+                            'amount' => $item->amount
+                        ];
+                    }) :
+                    []
+            ];
+        }
+
+        $completionPercentage = $totalDepts > 0 ? ($closedDepts / $totalDepts) * 100 : 0;
+        $monthNames = $this->getMonthNames();
+
         // Carrega os departamentos e suas despesas em uma única consulta
         $departments = Department::where('secretary_id', $secretary->id)
             ->with(['expenses' => function ($query) {
@@ -679,7 +731,7 @@ class DashboardController extends Controller
             return $expense->expense_date->format('Y-m') === now()->format('Y-m');
         })->sum('amount');
 
-        // Gastos do mês anterior - APENAS DA SECRETARIA DO USUÁRIO
+// Gastos do mês anterior - APENAS DA SECRETARIA DO USUÁRIO
         $lastMonthExpenses = $expenses->filter(function ($expense) {
             return $expense->expense_date->format('Y-m') === now()->subMonth()->format('Y-m');
         })->sum('amount');
@@ -692,6 +744,9 @@ class DashboardController extends Controller
         // Dados para o gráfico de Evolução Mensal - APENAS DA SECRETARIA DO USUÁRIO
         $monthlyExpenses = $this->getMonthlyExpenses($secretary->id);
 
+        // Preparar variáveis para a view
+        $monthName = $monthNames[$month] ?? '';
+
         return view('dashboard.secretary', compact(
             'secretary',
             'departments',
@@ -700,32 +755,17 @@ class DashboardController extends Controller
             'currentMonthExpenses',
             'lastMonthExpenses',
             'topDepartment',
-            'monthlyExpenses'
+            'monthlyExpenses',
+            'departmentsData',
+            'completionPercentage',
+            'closedDepts',
+            'totalDepts',
+            'monthName',
+            'year',
+            'month'
         ));
     }
 
-    /**
-     * Retorna as despesas mensais da secretaria para o gráfico de Evolução Mensal
-     */
-    private function getMonthlyExpenses($secretaryId)
-    {
-        return Expense::whereHas('department', function ($query) use ($secretaryId) {
-            $query->where('secretary_id', $secretaryId);
-        })
-            ->selectRaw('YEAR(expense_date) as year, MONTH(expense_date) as month, SUM(amount) as total')
-            ->groupBy('year', 'month')
-            ->orderBy('year')
-            ->orderBy('month')
-            ->get();
-    }
-
-
-    /**
-     * Dashboard para líderes de setor
-     * Exibe informações e gráficos específicos para o departamento do líder de setor
-     *
-     * @return \Illuminate\View\View
-     */
     /**
      * Dashboard para líderes de setor
      * Exibe informações e gráficos específicos para o departamento do líder de setor
@@ -742,6 +782,45 @@ class DashboardController extends Controller
         }
 
         $department = $user->department;
+
+        // Carrega dados de compliance para o departamento
+        $currentDate = Carbon::now();
+        $year = request()->input('year', $currentDate->year);
+        $month = request()->input('month', $currentDate->month);
+
+        // Verificar status de compliance
+        $closeCheck = app(ComplianceController::class)->canCloseMonth($department->id, $year, $month);
+        $submission = MonthlyExpenseSubmission::where('department_id', $department->id)
+            ->where('year', $year)
+            ->where('month', $month)
+            ->first();
+
+        $isClosed = $submission && $submission->is_submitted;
+
+        // Preparar dados de compliance
+        $deptComplianceData = [
+            'id' => $department->id,
+            'is_closed' => $isClosed,
+            'submitted_at' => $submission ? $submission->submitted_at : null,
+            'submitted_by' => $submission ? ($submission->submitter->name ?? 'Sistema') : null,
+            'status' => $isClosed ? 'closed' : ($closeCheck['can_close'] ? 'ready_to_close' : 'incomplete'),
+            'can_close' => $closeCheck['can_close'] ?? false,
+            'missing_categories_count' => isset($closeCheck['missing_categories']) ? count($closeCheck['missing_categories']) : 0,
+            'missing_categories' => isset($closeCheck['missing_categories']) ?
+                ExpenseType::whereIn('id', $closeCheck['missing_categories'])->pluck('name') : [],
+            'missing_fixed_expenses_count' => isset($closeCheck['missing_fixed_expenses']) ? count($closeCheck['missing_fixed_expenses']) : 0,
+            'missing_fixed_expenses' => isset($closeCheck['missing_fixed_expenses']) ?
+                FixedExpense::whereIn('id', $closeCheck['missing_fixed_expenses'])->get()->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'name' => $item->name,
+                        'amount' => $item->amount
+                    ];
+                }) : []
+        ];
+
+        $monthNames = $this->getMonthNames();
+        $monthName = $monthNames[$month] ?? '';
 
         // Carrega APENAS as despesas do departamento específico do líder
         $expenses = Expense::where('department_id', $department->id)
@@ -792,8 +871,92 @@ class DashboardController extends Controller
             'budgetCap',
             'monthlyExpenses',
             'expenseTypeData',
-            'recentExpenses'
+            'recentExpenses',
+            'deptComplianceData',
+            'monthName',
+            'year',
+            'month'
         ));
+    }
+
+    /**
+     * Retorna um array com os nomes dos meses.
+     */
+    private function getMonthNames()
+    {
+        return [
+            1 => 'Janeiro',
+            2 => 'Fevereiro',
+            3 => 'Março',
+            4 => 'Abril',
+            5 => 'Maio',
+            6 => 'Junho',
+            7 => 'Julho',
+            8 => 'Agosto',
+            9 => 'Setembro',
+            10 => 'Outubro',
+            11 => 'Novembro',
+            12 => 'Dezembro'
+        ];
+    }
+
+    /**
+     * Obtém dados de compliance para o dashboard do prefeito
+     */
+    private function getComplianceData()
+    {
+        $currentDate = Carbon::now();
+        $year = $currentDate->year;
+        $month = $currentDate->month;
+
+        // Buscar todas as secretarias com seus departamentos
+        $secretaries = Secretary::withCount(['departments'])
+            ->with(['departments' => function ($query) use ($year, $month) {
+                $query->with(['monthlySubmissions' => function ($q) use ($year, $month) {
+                    $q->where('year', $year)->where('month', $month);
+                }]);
+            }])
+            ->get();
+
+        // Processar dados para cada secretaria
+        $secretariesData = $secretaries->map(function ($secretary) use ($year, $month) {
+            $totalDepts = $secretary->departments_count;
+            $closedDepts = $secretary->departments->filter(function ($dept) use ($year, $month) {
+                // Verificar se existe alguma submissão e pegar a primeira
+                $submission = $dept->monthlySubmissions->first();
+                return $submission && $submission->is_submitted;
+            })->count();
+
+            return [
+                'id' => $secretary->id,
+                'name' => $secretary->name,
+                'total_departments' => $totalDepts,
+                'closed_departments' => $closedDepts,
+                'completion_percentage' => $totalDepts > 0 ? ($closedDepts / $totalDepts) * 100 : 0,
+                'status' => $totalDepts === $closedDepts ? 'complete' : 'incomplete'
+            ];
+        });
+
+        return [
+            'secretaries' => $secretariesData,
+            'year' => $year,
+            'month' => $month
+        ];
+    }
+
+    /**
+     * Retorna as despesas mensais da secretaria para o gráfico de Evolução Mensal
+     */
+    private function getMonthlyExpenses($secretaryId)
+    {
+        return Expense::whereHas('department', function ($query) use ($secretaryId) {
+            $query->where('secretary_id', $secretaryId);
+        })
+            ->selectRaw('YEAR(expense_date) as year, MONTH(expense_date) as month, SUM(amount) as total')
+            ->groupBy('year', 'month')
+            ->orderBy('year')
+            ->orderBy('month')
+            ->get();
     }
 
     /**
@@ -912,6 +1075,28 @@ class DashboardController extends Controller
         $budgetCap = $this->expenseCapService->getCapForExpense($departmentId) ??
             config('app.default_department_budget', 15000);
 
+        // Dados de compliance
+        $year = now()->year;
+        $month = now()->month;
+
+        // Obter dados de compliance atualizados
+        $closeCheck = app(ComplianceController::class)->canCloseMonth($departmentId, $year, $month);
+        $submission = MonthlyExpenseSubmission::where('department_id', $departmentId)
+            ->where('year', $year)
+            ->where('month', $month)
+            ->first();
+
+        $isClosed = $submission && $submission->is_submitted;
+
+        $complianceData = [
+            'is_closed' => $isClosed,
+            'status' => $isClosed ? 'closed' : ($closeCheck['can_close'] ? 'ready_to_close' : 'incomplete'),
+            'can_close' => $closeCheck['can_close'] ?? false,
+            'missing_items_count' =>
+                (isset($closeCheck['missing_categories']) ? count($closeCheck['missing_categories']) : 0) +
+                (isset($closeCheck['missing_fixed_expenses']) ? count($closeCheck['missing_fixed_expenses']) : 0)
+        ];
+
         // Retorna JSON com dados para o front-end
         return response()->json([
             'totalExpenses' => $expenses->sum('amount'),
@@ -922,6 +1107,7 @@ class DashboardController extends Controller
             'expenseTypeData' => $this->getExpenseTypeDataForDepartment($expenses),
             'referenceStartDate' => $referenceStartDate->format('Y-m-d'),
             'referenceEndDate' => $referenceEndDate->format('Y-m-d'),
+            'complianceData' => $complianceData
         ]);
     }
 
@@ -1017,6 +1203,47 @@ class DashboardController extends Controller
             })
             ->sortByDesc('total')
             ->values();
+
+        // Dados de compliance
+        $year = now()->year;
+        $month = now()->month;
+
+        // Carregar status de compliance para os departamentos
+        $complianceDepartments = Department::where('secretary_id', $secretaryId)
+            ->with(['monthlySubmissions' => function ($q) use ($year, $month) {
+                $q->where('year', $year)->where('month', $month);
+            }])
+            ->get();
+
+        $deptComplianceData = $complianceDepartments->map(function ($dept) use ($year, $month) {
+            $closeCheck = app(ComplianceController::class)->canCloseMonth($dept->id, $year, $month);
+            $submission = $dept->monthlySubmissions->first();
+            $isClosed = $submission && $submission->is_submitted;
+
+            return [
+                'id' => $dept->id,
+                'name' => $dept->name,
+                'is_closed' => $isClosed,
+                'status' => $isClosed ? 'closed' : ($closeCheck['can_close'] ? 'ready_to_close' : 'incomplete'),
+                'can_close' => $closeCheck['can_close'] ?? false,
+                'missing_items_count' =>
+                    (isset($closeCheck['missing_categories']) ? count($closeCheck['missing_categories']) : 0) +
+                    (isset($closeCheck['missing_fixed_expenses']) ? count($closeCheck['missing_fixed_expenses']) : 0)
+            ];
+        });
+
+        $closedDepts = $deptComplianceData->filter(function ($dept) {
+            return $dept['is_closed'];
+        })->count();
+
+        $complianceData = [
+            'departments' => $deptComplianceData,
+            'closedDepartments' => $closedDepts,
+            'totalDepartments' => count($deptComplianceData),
+            'completionPercentage' => count($deptComplianceData) > 0
+                ? ($closedDepts / count($deptComplianceData)) * 100
+                : 0
+        ];
 
         // Prepara dados de tipo de despesa (para gráfico de pizza)
         $expenseTypeData = ExpenseType::withCount(['expenses' => function ($query) use ($expenses) {
@@ -1114,7 +1341,7 @@ class DashboardController extends Controller
             'series' => $series,
             'referenceStartDate' => $referenceStartDate->format('Y-m-d'),
             'referenceEndDate' => $referenceEndDate->format('Y-m-d'),
+            'complianceData' => $complianceData
         ]);
     }
-
 }

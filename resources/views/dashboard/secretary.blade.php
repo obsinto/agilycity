@@ -135,6 +135,74 @@
             <div id="expenseTypePie" class="h-96"></div>
         </div>
 
+        // Vistoria
+        <!-- Status de Fechamento de Departamentos -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">Status de Fechamento - {{ $monthName }}/{{ $year }}</h2>
+                <a href="{{ route('compliance.dashboard') }}" class="text-sm text-blue-600 hover:underline">
+                    Ver dashboard completo →
+                </a>
+            </div>
+
+            <div class="flex items-center mb-4">
+                <div class="w-full bg-gray-200 rounded-full h-4 mr-2">
+                    <div class="bg-blue-600 h-4 rounded-full" style="width: {{ $completionPercentage }}%"></div>
+                </div>
+                <span class="text-sm font-medium">{{ number_format($completionPercentage, 1) }}%</span>
+            </div>
+
+            <div class="text-sm text-gray-600 mb-4">
+                {{ $closedDepartments }} de {{ $totalDepartments }} departamentos fechados
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                @foreach($departmentsData as $dept)
+                    <div
+                        class="border rounded-lg p-4 {{ $dept['is_closed'] ? 'border-green-500' : 'border-yellow-500' }}">
+                        <h3 class="font-medium">{{ $dept['name'] }}</h3>
+
+                        @if($dept['is_closed'])
+                            <div class="mt-2 text-sm text-green-600 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
+                                     viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M5 13l4 4L19 7"/>
+                                </svg>
+                                Mês Fechado
+                            </div>
+                        @elseif($dept['status'] == 'ready_to_close')
+                            <div class="mt-2 text-sm text-blue-600 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
+                                     viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Pronto para Fechar
+                            </div>
+                        @else
+                            <div class="mt-2 text-sm text-yellow-600 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
+                                     viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Pendente
+                            </div>
+                        @endif
+
+                        @if(!$dept['is_closed'] && count($dept['missing_categories']) > 0 || count($dept['missing_fixed_expenses']) > 0)
+                            <div class="mt-1 text-xs text-red-500">
+                                {{ count($dept['missing_categories']) + count($dept['missing_fixed_expenses']) }}
+                                pendências
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+
         <!-- Timeline -->
         <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-lg font-semibold mb-4">Evolução Mensal</h2>
